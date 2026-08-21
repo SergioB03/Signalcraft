@@ -89,6 +89,15 @@ spec's gate, feature work started only after this point.
   signs in, subscribes to WeatherState, submits a ping, and fails loudly if no
   subscription event lands within 30s. Repeatable evidence for the riskiest wire.
 
+### Hardening: pings are now create-only for humans
+
+Came out of a design-review discussion: no client code ever reads raw pings (the UI
+reads WeatherState; the weather Lambda reads pings via its IAM resource grant), so
+member read access on Ping was unnecessary. Tightened to `create` only — least
+privilege. Anonymity never depended on this (Ping stores no userId), but unused
+permissions are the kind that bite later. Revisit if the Tier-3 history sparkline
+ever needs client-side ping reads.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root

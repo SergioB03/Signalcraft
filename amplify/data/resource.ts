@@ -42,7 +42,10 @@ const schema = a
         // the weather window is enforced by createdAt in the Lambda).
         expiresAt: a.timestamp(),
       })
-      .authorization((allow) => [allow.authenticated().to(['create', 'read'])]),
+      // create-only for humans: no client reads raw pings (the UI reads
+      // WeatherState; only the weather Lambda lists pings). Least privilege —
+      // unnecessary read access is the kind that bites later.
+      .authorization((allow) => [allow.authenticated().to(['create'])]),
 
     PingReceipt: a
       .model({
