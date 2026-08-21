@@ -236,6 +236,28 @@ removed the call path entirely; the click-through now runs with zero console
 errors. Remaining: record the video from docs/demo-script.md, write the
 article from this file, submit.
 
+### First real tester report (Fri ~1:30 AM): three bugs, three root causes
+
+The developer signed up with a real email on the public URL (confirmation
+email path proven) and reported: the dev page felt laggy, no dev access, and
+"poses acting on the wrong character".
+
+- **Wrong character = shared browser session.** Amplify keeps one
+  "last signed-in user" per browser. Sign in as a second account in another
+  tab and the first tab's tokens silently become that account while its React
+  state still says "you are ana" — so a pose change lands on whoever the
+  tokens say. Fix: listen for the cross-tab `storage` event on the auth key
+  and reload, so every tab always reflects its real session; pose updates now
+  surface errors instead of failing silently. (Private/incognito windows
+  never had this problem, which is why the headless tests never saw it.)
+- **Laggy = phone DPR.** At devicePixelRatio 3, the river was a ~3500px-wide
+  backing store redrawn 60×/s. Now: DPR capped at 1.5, 30fps throttle, paused
+  when the tab is hidden or the river scrolls out of view, fewer raindrops.
+- **No dev access** was just group membership — granted lead + dev to the real
+  account. Added a "your name on the river" editor while at it, since real
+  sign-ups were stuck floating as their email prefix.
+- Mobile pass: tabs were stacking vertically in the header; now a second row.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root
