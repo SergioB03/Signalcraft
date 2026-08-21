@@ -56,6 +56,11 @@ the **dev** tab: forget today's pings so accounts can ping again, wipe the
 river, or wipe-and-reseed a fresh presentable day. Anyone can sign up with a
 real email and join the same river.
 
+Everyone picks a **pose** (floating, waving, on a raft, underwater, struck,
+coconut mode) and a **spot** on the river (drifting, the headwater, the rapids,
+on the big rock, in the shade, the shallows, the eddy). Both are self-chosen
+and never inferred from mood data; both sync live to every open window.
+
 Tabs live in the URL hash (`#team`, `#report`, `#dev`), so refresh, back, and
 deep links behave with no router.
 

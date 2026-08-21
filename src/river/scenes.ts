@@ -142,10 +142,24 @@ export type AvatarPose =
   | 'coconut'
   | 'waving'
 
+/** Discrete named places on the river — chosen, never free-roamed. */
+export type Spot = 'drift' | 'headwater' | 'rapids' | 'rock' | 'shade' | 'shallows' | 'eddy'
+
+export const SPOTS: Array<{ spot: Spot; label: string; hint: string }> = [
+  { spot: 'drift', label: 'drifting', hint: 'wherever the current puts you' },
+  { spot: 'headwater', label: 'the headwater', hint: 'upstream, where it all starts' },
+  { spot: 'rapids', label: 'the rapids', hint: 'the fast stretch between the drops' },
+  { spot: 'rock', label: 'on the big rock', hint: 'dry, mostly' },
+  { spot: 'shade', label: 'in the shade', hint: 'under the old tree on the bank' },
+  { spot: 'shallows', label: 'the shallows', hint: 'ankle-deep at the near bank' },
+  { spot: 'eddy', label: 'the eddy', hint: 'the calm pool downstream' },
+]
+
 export type RiverMember = {
   id: string
   displayName: string
   pose: AvatarPose
+  spot: Spot
   isMe: boolean
 }
 

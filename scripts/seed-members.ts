@@ -27,12 +27,19 @@ if (!password) {
 }
 
 type Pose = Schema['Membership']['type']['avatarPose']
-const CAST: Array<{ email: string; name: string; role: 'lead' | 'member'; pose: Pose }> = [
-  { email: 'demo1@undercurrent.local', name: 'ana', role: 'lead', pose: 'coconut' },
-  { email: 'demo2@undercurrent.local', name: 'kai', role: 'member', pose: 'floating' },
-  { email: 'demo3@undercurrent.local', name: 'mira', role: 'member', pose: 'waving' },
-  { email: 'demo4@undercurrent.local', name: 'theo', role: 'member', pose: 'raft' },
-  { email: 'demo5@undercurrent.local', name: 'june', role: 'member', pose: 'underwater' },
+type Spot = Schema['Membership']['type']['spot']
+const CAST: Array<{
+  email: string
+  name: string
+  role: 'lead' | 'member'
+  pose: Pose
+  spot: Spot
+}> = [
+  { email: 'demo1@undercurrent.local', name: 'ana', role: 'lead', pose: 'coconut', spot: 'shade' },
+  { email: 'demo2@undercurrent.local', name: 'kai', role: 'member', pose: 'floating', spot: 'drift' },
+  { email: 'demo3@undercurrent.local', name: 'mira', role: 'member', pose: 'waving', spot: 'headwater' },
+  { email: 'demo4@undercurrent.local', name: 'theo', role: 'member', pose: 'raft', spot: 'rapids' },
+  { email: 'demo5@undercurrent.local', name: 'june', role: 'member', pose: 'underwater', spot: 'eddy' },
 ]
 
 Amplify.configure(outputs)
@@ -52,6 +59,7 @@ for (const person of CAST) {
         displayName: person.name,
         role: person.role,
         avatarPose: person.pose,
+        spot: person.spot,
       })
     : await client.models.Membership.create({
         id,
@@ -60,8 +68,9 @@ for (const person of CAST) {
         displayName: person.name,
         role: person.role,
         avatarPose: person.pose,
+        spot: person.spot,
       })
   if (result.errors) console.error(`${person.email}: ${JSON.stringify(result.errors)}`)
-  else console.log(`${person.email} → ${person.name} (${person.role}, ${person.pose})`)
+  else console.log(`${person.email} → ${person.name} (${person.role}, ${person.pose}, ${person.spot})`)
 }
 console.log('cast is on the river.')
