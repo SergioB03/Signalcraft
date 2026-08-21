@@ -318,6 +318,26 @@ the land. Final visual round before the freeze:
   the lower left, so they rarely fight; on phones the stream ends higher and
   the two downstream spots move upstream so the caption band stays clear.
 
+### Immersive HUD experiment (Fri morning, branch `immersive-hud`)
+
+An external design pass proposed a full-bleed river with a glass "island"
+floating over it and riverstone mood selectors. Adapted rather than pasted:
+
+- The canvas gained a `fill` mode plus `rightInset`/`bottomInset` so the
+  stream ends short of the panel (desktop) or the bottom sheet (phone) —
+  avatars never hide behind glass; collapsing the island lets the river run
+  the full width.
+- The island scrolls internally (the source clipped with overflow hidden),
+  centers without transforms (the source's reduced-motion rule would have
+  broken its own centering), and the header text is pinned to foam because
+  it sits on a dark gradient in both themes.
+- **Token lesson**: the source used `--silt` as "dark text"; in our light
+  theme `--silt` is the pale page ground (tokens are roles, not colors), so
+  every inherited heading vanished. `--foam` is the text role in both themes.
+- Mood tiles became riverstones (irregular radii, wet glow when chosen, clay
+  for a 1); labels moved to a live caption under the stones.
+- Verified: click-through, scenes, light/dark, mobile sheet, collapsed state.
+
 ### Color and character (Fri ~4:30 AM): the people stop being stick figures
 
 The developer's last note: still too plain, characters too basic, more color.
