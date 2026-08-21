@@ -34,6 +34,8 @@ const schema = a
         displayName: a.string().required(),
         // Self-selected, never derived from mood data.
         avatarPose: a.enum(['floating', 'raft', 'underwater', 'struck', 'coconut', 'waving']),
+        // Where on the river you sit — discrete named spots, never free movement.
+        spot: a.enum(['drift', 'headwater', 'rapids', 'rock', 'shade', 'shallows', 'eddy']),
       })
       // Everyone sees the roster; you edit only yourself; leads can remove.
       .authorization((allow) => [

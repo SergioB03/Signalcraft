@@ -14,8 +14,8 @@ import { generateClient } from 'aws-amplify/data'
 import gsap from 'gsap'
 import type { Schema } from '../amplify/data/resource'
 import RiverCanvas from './river/RiverCanvas'
-import { SCENES, SCENE_ORDER } from './river/scenes'
-import type { AvatarPose, RiverMember, SceneName } from './river/scenes'
+import { SCENES, SCENE_ORDER, SPOTS } from './river/scenes'
+import type { AvatarPose, RiverMember, SceneName, Spot } from './river/scenes'
 import BlurText from './ui/BlurText'
 import LoginHorizon from './ui/LoginHorizon'
 import SceneTitle from './ui/SceneTitle'
@@ -438,8 +438,20 @@ function Home({
     id: m.id,
     displayName: m.displayName,
     pose: (m.avatarPose ?? 'floating') as AvatarPose,
+    spot: (m.spot ?? 'drift') as Spot,
     isMe: m.userId === myUserId,
   }))
+  const mySpot = (members.find((m) => m.id === myMembershipId)?.spot ?? 'drift') as Spot
+
+  const setSpot = async (spot: Spot) => {
+    if (!myMembershipId) return
+    setPoseError('')
+    const { errors } = await client.models.Membership.update({ id: myMembershipId, spot })
+    if (errors)
+      setPoseError(
+        'could not move you — if you signed in as someone else in another tab, reload this one.',
+      )
+  }
 
   const me = members.find((m) => m.id === myMembershipId) ?? null
 
@@ -537,6 +549,23 @@ function Home({
                 </button>
               ))}
             </div>
+            <h3 className="sub">where you are</h3>
+            <div className="pose-row" role="radiogroup" aria-label="choose your spot">
+              {SPOTS.map((sp) => (
+                <button
+                  key={sp.spot}
+                  role="radio"
+                  aria-checked={mySpot === sp.spot}
+                  className={mySpot === sp.spot ? 'pose selected' : 'pose'}
+                  disabled={!myMembershipId}
+                  title={sp.hint}
+                  onClick={() => setSpot(sp.spot)}
+                >
+                  {sp.label}
+                </button>
+              ))}
+            </div>
+            <p className="muted small">{SPOTS.find((sp) => sp.spot === mySpot)?.hint}</p>
             {poseError && <p className="error">{poseError}</p>}
             <NameEditor current={me?.displayName ?? ''} disabled={!myMembershipId} onSave={saveName} />
           </section>

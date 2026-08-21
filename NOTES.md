@@ -292,6 +292,31 @@ clouds, rain, lightning. Built on a branch so main stayed deployable.
 - Review note to self: foam rings around rocks read as eyeballs. Bow-wave
   plus wake streaks instead.
 
+### The river, third draft (Fri ~3:30 AM): corner to corner, stepping down
+
+The toward-the-viewer stream was better but still piled avatars onto the
+scene name on phones, and the developer's references (The Flame in the Flood,
+River Run) pointed at a three-quarter view with the river cutting *across*
+the land. Final visual round before the freeze:
+
+- **The river is a sampled path** — 80 samples, each with position, tangent
+  (downstream), normal (toward the upper bank), perspective scale, and
+  half-width — running from the upper left to the lower right with a gentle
+  meander. Everything is placed relative to it: grass skips the channel,
+  reeds sit at lane ±1, trees stand off the banks, flow streaks ride the
+  tangent, rocks rotate with the current.
+- **"Descending" is two drops**: a dark lip, a foam line across the stream,
+  and a churn of short streaks below, at 30% and 62% of the way down. The
+  upper bank catches a highlight, the cue that the land steps down.
+- **Named spots instead of free roaming** (the spec's line): drifting (auto
+  slots along the stream), the headwater, the rapids, on the big rock, in
+  the shade of the old tree, the shallows, the eddy. A `spot` enum on
+  Membership, a picker beside the poses, the same subscription. People on
+  land don't bob and cast a small shadow. Several people on one spot fan out.
+- Whitecaps are short flecks; long bright strokes read as debris in a storm.
+- Layout bonus: the river ends in the lower right, the scene name lives in
+  the lower left, so they never fight — on any screen width.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { SCENES, hexToRgb, lerp, lerpRgb, rgbCss } from './scenes'
-import type { Rgb, RiverMember, SceneName } from './scenes'
+import type { Rgb, RiverMember, SceneName, Spot } from './scenes'
 
 type Props = {
   scene: SceneName | null
@@ -8,18 +8,20 @@ type Props = {
 }
 
 /**
- * A stream running downhill toward the viewer. Perspective is faked with two
- * functions of screen-y: centerX (a gentle S-curve) and halfWidth (narrow at
- * the horizon, wide at the bank). Everything on the land — grass, reeds,
- * trees, rocks — is laid out once in unit space and scaled by that same
- * perspective, so the scene survives resizes and stays coherent.
+ * A three-quarter view of a stream cutting across the land from the upper
+ * left to the lower right, stepping down over two small drops on the way.
  *
- * Weather is one scalar. Severity drives flow speed, chop, whitecaps, rain,
- * cloud mass, lightning, how hard the reeds lean, how far the greens drain
- * out of the banks, and how much the avatars bob.
+ * The river is a sampled path: each sample carries a position, a tangent
+ * (downstream), a normal (toward the upper bank), a perspective scale, and a
+ * half-width. Everything else — grass, reeds, trees, rocks, flow, avatars —
+ * is placed relative to that path, so the whole landscape is one idea.
+ *
+ * Weather is one scalar. Severity drives flow speed, chop, whitecaps, foam
+ * at the rocks and drops, rain, cloud mass, lightning, how hard the reeds
+ * lean, how far the greens drain out of the banks, and how much the avatars
+ * bob.
  */
 
-/** Numeric snapshot of everything the renderer needs; tweened, never snapped. */
 type Palette = {
   severity: number
   skyTop: Rgb
@@ -35,15 +37,15 @@ type Palette = {
 }
 
 const TWEEN_MS = 2000
-// Phones report DPR 3: a 1170px-wide river becomes a 3500px backing store
-// redrawn 60×/s. Capping DPR and frame rate keeps it fluid on a phone at a
-// fraction of the cost; nobody can see the difference at these sizes.
 const MAX_DPR = 1.5
 const FRAME_MS = 1000 / 30
 
 const FOAM: Rgb = [230, 237, 242]
 const FOAM_CSS = '#e6edf2'
 const SUN_CSS = '#e8c87e'
+const DROPS = [0.3, 0.62] // where the stream steps down
+const BIG_TREE = { u: 0.42, size: 1.7 } // the shade spot lives under it
+const BIG_ROCK = { u: 0.56, lane: 0.3, size: 1.9 } // the rock spot sits on it
 
 function paletteFor(scene: SceneName): Palette {
   const s = SCENES[scene]
@@ -80,7 +82,6 @@ function mix(a: Palette, b: Palette, t: number): Palette {
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
-// Deterministic pseudo-random in [0,1): the same scenery every visit.
 const rnd = (i: number, salt = 0) => {
   const x = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453
   return x - Math.floor(x)
@@ -88,46 +89,60 @@ const rnd = (i: number, salt = 0) => {
 
 type Raindrop = { x: number; y: number; len: number; speed: number }
 
+type Sample = {
+  u: number
+  x: number
+  y: number
+  tx: number
+  ty: number
+  nx: number
+  ny: number
+  s: number
+  hw: number
+}
+
 type Scenery = {
   grass: Array<{ u: number; v: number; len: number; shade: number }>
-  reeds: Array<{ side: -1 | 1; v: number; off: number; h: number; phase: number }>
-  trees: Array<{ side: -1 | 1; v: number; off: number; size: number; shade: number }>
-  rocks: Array<{ lane: number; v: number; size: number }>
+  reeds: Array<{ side: -1 | 1; u: number; off: number; h: number; phase: number }>
+  trees: Array<{ side: -1 | 1; u: number; off: number; size: number; shade: number }>
+  rocks: Array<{ lane: number; u: number; size: number }>
   streaks: Array<{ lane: number; phase: number; len: number }>
 }
 
 function makeScenery(): Scenery {
-  const grass = Array.from({ length: 260 }, (_, i) => ({
-    u: rnd(i, 1),
-    v: rnd(i, 2) ** 0.6, // denser toward the viewer
-    len: 0.4 + rnd(i, 3) * 0.6,
-    shade: rnd(i, 4),
-  }))
-  const reeds = Array.from({ length: 30 }, (_, i) => ({
-    side: (i % 2 === 0 ? 1 : -1) as 1 | -1,
-    v: 0.12 + rnd(i, 5) * 0.85,
-    off: rnd(i, 6),
-    h: 0.6 + rnd(i, 7) * 0.6,
-    phase: rnd(i, 8) * Math.PI * 2,
-  }))
-  const trees = Array.from({ length: 12 }, (_, i) => ({
-    side: (i % 2 === 0 ? 1 : -1) as 1 | -1,
-    v: 0.04 + rnd(i, 9) * 0.8,
-    off: 0.1 + rnd(i, 10) * 0.9,
-    size: 0.7 + rnd(i, 11) * 0.7,
-    shade: rnd(i, 12),
-  })).sort((a, b) => a.v - b.v)
-  const rocks = Array.from({ length: 6 }, (_, i) => ({
-    lane: (rnd(i, 13) - 0.5) * 1.4,
-    v: 0.3 + rnd(i, 14) * 0.6,
-    size: 0.6 + rnd(i, 15) * 0.8,
-  }))
-  const streaks = Array.from({ length: 70 }, (_, i) => ({
-    lane: (rnd(i, 16) - 0.5) * 1.7,
-    phase: rnd(i, 17),
-    len: 0.6 + rnd(i, 18) * 0.8,
-  }))
-  return { grass, reeds, trees, rocks, streaks }
+  return {
+    grass: Array.from({ length: 280 }, (_, i) => ({
+      u: rnd(i, 1),
+      v: rnd(i, 2),
+      len: 0.4 + rnd(i, 3) * 0.6,
+      shade: rnd(i, 4),
+    })),
+    reeds: Array.from({ length: 34 }, (_, i) => ({
+      side: (i % 2 === 0 ? 1 : -1) as 1 | -1,
+      u: 0.06 + rnd(i, 5) * 0.9,
+      off: rnd(i, 6),
+      h: 0.6 + rnd(i, 7) * 0.6,
+      phase: rnd(i, 8) * Math.PI * 2,
+    })),
+    trees: Array.from({ length: 11 }, (_, i) => ({
+      side: (i % 2 === 0 ? 1 : -1) as 1 | -1,
+      u: 0.03 + rnd(i, 9) * 0.94,
+      off: 0.15 + rnd(i, 10) * 0.85,
+      size: 0.7 + rnd(i, 11) * 0.6,
+      shade: rnd(i, 12),
+    })),
+    // most rocks in the rapids stretch between the drops
+    rocks: Array.from({ length: 6 }, (_, i) => ({
+      lane: (rnd(i, 13) - 0.5) * 1.4,
+      u: i < 4 ? 0.33 + rnd(i, 14) * 0.27 : 0.08 + rnd(i, 14) * 0.85,
+      size: 0.5 + rnd(i, 15) * 0.6,
+    })),
+    streaks: Array.from({ length: 72 }, (_, i) => ({
+      lane: (rnd(i, 16) - 0.5) * 1.7,
+      phase: rnd(i, 17),
+      len: 0.6 + rnd(i, 18) * 0.8,
+    })),
+  }
 }
 
 export default function RiverCanvas({ scene, members }: Props) {
@@ -135,8 +150,6 @@ export default function RiverCanvas({ scene, members }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlayRef = useRef<HTMLCanvasElement>(null)
 
-  // Imperative state lives in refs: the draw loop reads them every frame
-  // without re-rendering React.
   const membersRef = useRef<RiverMember[]>(members)
   membersRef.current = members
   const sceneryRef = useRef<Scenery | null>(null)
@@ -185,11 +198,10 @@ export default function RiverCanvas({ scene, members }: Props) {
     const size = () => {
       dpr = currentDpr()
       const w = wrap.clientWidth
-      // Phones get a taller frame: a narrow stream needs vertical room for the
-      // avatars to sit above the scene name instead of on it.
+      // Phones get a taller frame so the diagonal has room to descend.
       const h =
         w < 600
-          ? Math.min(380, Math.max(280, Math.round(w * 0.8)))
+          ? Math.min(400, Math.max(300, Math.round(w * 0.85)))
           : Math.min(460, Math.max(260, Math.round(w * 0.5)))
       for (const c of [canvas, overlay]) {
         c.width = Math.round(w * dpr)
@@ -207,18 +219,60 @@ export default function RiverCanvas({ scene, members }: Props) {
       const p = mix(tw.from, tw.to, progress)
       const t = reducedMotion.matches ? 0 : now
       const sev = p.severity
-
-      // --- perspective ----------------------------------------------------
-      const horizon = h * 0.34
-      const span = h - horizon
-      const riverT = (y: number) => clamp01((y - horizon) / span)
-      const centerX = (y: number) => {
-        const r = riverT(y)
-        return w * 0.5 + Math.sin(r * 2.4 + 0.8) * w * 0.09 * r
-      }
-      const halfWidth = (y: number) => lerp(w * 0.01, w * 0.3, riverT(y) ** 1.4)
-      const ground = (v: number) => horizon + v * span
+      const narrow = w < 600
+      const horizon = h * 0.26
       const wind = Math.sin(t * 0.0011) * (0.3 + sev * 1.4) + sev * 0.9
+
+      // --- the river path -------------------------------------------------
+      const N = 80
+      const path: Sample[] = []
+      for (let i = 0; i <= N; i++) {
+        const u = i / N
+        path.push({
+          u,
+          x: lerp(-0.06 * w, 1.06 * w, u),
+          y:
+            horizon +
+            h * 0.07 +
+            (h - horizon - h * 0.16) * u ** 1.08 +
+            Math.sin(u * 6.5 + 1.2) * h * 0.035,
+          tx: 0,
+          ty: 0,
+          nx: 0,
+          ny: 0,
+          s: 0.55 + 0.7 * u,
+          hw: lerp(w * 0.022, w * 0.075, u) * (narrow ? 1.3 : 1),
+        })
+      }
+      for (let i = 0; i <= N; i++) {
+        const a = path[Math.max(0, i - 1)]
+        const b = path[Math.min(N, i + 1)]
+        const dx = b.x - a.x
+        const dy = b.y - a.y
+        const len = Math.hypot(dx, dy) || 1
+        path[i].tx = dx / len
+        path[i].ty = dy / len
+        // normal toward the upper bank (screen-up side)
+        path[i].nx = path[i].ty
+        path[i].ny = -path[i].tx
+      }
+      const sampleAt = (u: number): Sample => path[Math.round(clamp01(u) * N)]
+      const pointAt = (u: number, lane: number) => {
+        const sp = sampleAt(u)
+        return { x: sp.x + lane * sp.hw * sp.nx, y: sp.y + lane * sp.hw * sp.ny, sp }
+      }
+      const nearest = (x: number, y: number) => {
+        let best = path[0]
+        let bd = Infinity
+        for (let i = 0; i <= N; i += 2) {
+          const d = Math.hypot(path[i].x - x, path[i].y - y)
+          if (d < bd) {
+            bd = d
+            best = path[i]
+          }
+        }
+        return { d: bd, sp: best }
+      }
 
       // --- sky ------------------------------------------------------------
       const sky = ctx.createLinearGradient(0, 0, 0, horizon)
@@ -227,27 +281,25 @@ export default function RiverCanvas({ scene, members }: Props) {
       ctx.fillStyle = sky
       ctx.fillRect(0, 0, w, horizon + 4)
 
-      // sun — a warm low light that severity slowly puts away
       if (p.sun > 0.02) {
-        const sx = w * 0.74
-        const sy = horizon * 0.42
-        const glow = ctx.createRadialGradient(sx, sy, 4, sx, sy, w * 0.11)
+        const sx = w * 0.82
+        const sy = horizon * 0.45
+        const glow = ctx.createRadialGradient(sx, sy, 3, sx, sy, w * 0.1)
         glow.addColorStop(0, `rgba(232, 200, 126, ${0.9 * p.sun})`)
         glow.addColorStop(1, 'rgba(232, 200, 126, 0)')
         ctx.fillStyle = glow
-        ctx.fillRect(sx - w * 0.12, sy - w * 0.12, w * 0.24, w * 0.24)
+        ctx.fillRect(sx - w * 0.11, sy - w * 0.11, w * 0.22, w * 0.22)
         ctx.fillStyle = `rgba(240, 214, 150, ${p.sun})`
         ctx.beginPath()
-        ctx.arc(sx, sy, 13, 0, Math.PI * 2)
+        ctx.arc(sx, sy, 11, 0, Math.PI * 2)
         ctx.fill()
       }
 
-      // clouds — count, mass, and darkness scale with cover and severity
       const cloudCount = Math.round(p.clouds * 7)
       for (let i = 0; i < cloudCount; i++) {
         const cx = ((rnd(i, 20) * (w + 260) + t * 0.01 * (1 + sev)) % (w + 260)) - 130
-        const cy = horizon * (0.16 + rnd(i, 21) * 0.5)
-        const scale = (0.7 + rnd(i, 22) * 0.8) * (1 + sev * 0.5)
+        const cy = horizon * (0.15 + rnd(i, 21) * 0.55)
+        const scale = (0.6 + rnd(i, 22) * 0.7) * (1 + sev * 0.5)
         const shade = 238 - sev * 165
         ctx.fillStyle = `rgba(${shade}, ${shade}, ${shade + 4}, ${0.4 + p.clouds * 0.35})`
         for (const [dx, dy, r] of [
@@ -262,7 +314,6 @@ export default function RiverCanvas({ scene, members }: Props) {
         }
       }
 
-      // distant hills, hazier the farther back
       for (let k = 0; k < 2; k++) {
         ctx.fillStyle = rgbCss(lerpRgb(p.hill, p.skyBottom, k === 0 ? 0.45 : 0.15))
         ctx.beginPath()
@@ -270,10 +321,10 @@ export default function RiverCanvas({ scene, members }: Props) {
         for (let x = 0; x <= w; x += 8) {
           const y =
             horizon -
-            (10 + k * 7) +
-            Math.sin(x * 0.011 + k * 2.1) * 7 +
+            (8 + k * 6) +
+            Math.sin(x * 0.011 + k * 2.1) * 6 +
             Math.sin(x * 0.027 + k) * 3 +
-            (k ? Math.sin(x * 0.005) * 9 : Math.sin(x * 0.004 + 1) * 12)
+            (k ? Math.sin(x * 0.005) * 8 : Math.sin(x * 0.004 + 1) * 11)
           ctx.lineTo(x, y)
         }
         ctx.lineTo(w, horizon + 6)
@@ -283,36 +334,60 @@ export default function RiverCanvas({ scene, members }: Props) {
 
       // --- land -----------------------------------------------------------
       const land = ctx.createLinearGradient(0, horizon, 0, h)
-      land.addColorStop(0, rgbCss(lerpRgb(p.bank, p.skyBottom, 0.4)))
-      land.addColorStop(1, rgbCss(lerpRgb(p.bank, [0, 0, 0], 0.12)))
+      land.addColorStop(0, rgbCss(lerpRgb(p.bank, p.skyBottom, 0.35)))
+      land.addColorStop(1, rgbCss(lerpRgb(p.bank, [0, 0, 0], 0.1)))
       ctx.fillStyle = land
-      ctx.fillRect(0, horizon, w, span)
+      ctx.fillRect(0, horizon, w, h - horizon)
 
-      // grass — short strokes, denser and longer toward the viewer
       ctx.lineCap = 'round'
       for (const g of scenery.grass) {
-        const y = ground(g.v)
         const x = g.u * w
-        if (Math.abs(x - centerX(y)) < halfWidth(y) + 6) continue
-        const r = riverT(y)
-        const len = (2 + r * 9) * g.len
-        ctx.strokeStyle = rgbCss(lerpRgb(p.foliage, p.bank, g.shade * 0.7), 0.55 + 0.35 * g.shade)
-        ctx.lineWidth = 1 + r * 0.8
+        const y = horizon + 4 + g.v * (h - horizon - 4)
+        const near = nearest(x, y)
+        if (near.d < near.sp.hw + 8) continue
+        const s = 0.5 + ((y - horizon) / (h - horizon)) * 0.8
+        const len = (2 + s * 7) * g.len
+        ctx.strokeStyle = rgbCss(lerpRgb(p.foliage, p.bank, g.shade * 0.7), 0.5 + 0.35 * g.shade)
+        ctx.lineWidth = 0.8 + s * 0.7
         ctx.beginPath()
         ctx.moveTo(x, y)
         ctx.lineTo(x + wind * len * 0.35, y - len)
         ctx.stroke()
       }
 
-      // trees on the outskirts, far ones first
+      // --- trees (incl. the old tree that casts the shade spot) ------------
+      type Tree = { x: number; y: number; s: number; shade: number; big: boolean }
+      const trees: Tree[] = []
       for (const tr of scenery.trees) {
-        const y = ground(tr.v)
-        const r = riverT(y)
-        const x = centerX(y) + tr.side * (halfWidth(y) + 28 * r + tr.off * w * 0.22 + 14)
-        if (x < -30 || x > w + 30) continue
-        const s = (0.45 + r * 0.9) * tr.size
+        const sp = sampleAt(tr.u)
+        const dist = sp.hw + 30 * sp.s + tr.off * h * 0.32
+        const x = sp.x + tr.side * dist * sp.nx
+        const y = sp.y + tr.side * dist * sp.ny
+        if (x < -30 || x > w + 30 || y < horizon + 8 || y > h + 10) continue
+        trees.push({ x, y, s: (0.5 + sp.s * 0.6) * tr.size, shade: tr.shade, big: false })
+      }
+      const bigSp = sampleAt(BIG_TREE.u)
+      const bigDist = bigSp.hw + 34 * bigSp.s
+      const bigTree: Tree = {
+        x: bigSp.x + bigDist * bigSp.nx,
+        y: bigSp.y + bigDist * bigSp.ny,
+        s: (0.5 + bigSp.s * 0.6) * BIG_TREE.size,
+        shade: 0.2,
+        big: true,
+      }
+      trees.push(bigTree)
+      trees.sort((a, b) => a.y - b.y)
+      for (const tr of trees) {
+        const s = tr.s
+        if (tr.big) {
+          // the shade itself: a pool of shadow cast toward the lower left
+          ctx.fillStyle = 'rgba(10, 14, 18, 0.2)'
+          ctx.beginPath()
+          ctx.ellipse(tr.x - 10 * s, tr.y + 4 * s, 22 * s, 8 * s, 0, 0, Math.PI * 2)
+          ctx.fill()
+        }
         ctx.fillStyle = rgbCss(lerpRgb(p.foliage, [0, 0, 0], 0.45))
-        ctx.fillRect(x - 1.6 * s, y - 13 * s, 3.2 * s, 13 * s)
+        ctx.fillRect(tr.x - 1.6 * s, tr.y - 13 * s, 3.2 * s, 13 * s)
         const sway = wind * 2 * s
         ctx.fillStyle = rgbCss(lerpRgb(p.foliage, p.bank, tr.shade * 0.4))
         for (const [dx, dy, rad] of [
@@ -321,113 +396,158 @@ export default function RiverCanvas({ scene, members }: Props) {
           [7.5, -14.5, 7.2],
         ]) {
           ctx.beginPath()
-          ctx.arc(x + dx * s + sway, y + dy * s, rad * s, 0, Math.PI * 2)
+          ctx.arc(tr.x + dx * s + sway, tr.y + dy * s, rad * s, 0, Math.PI * 2)
           ctx.fill()
         }
       }
 
       // --- water ----------------------------------------------------------
-      const chopAmp = 0.6 + sev * 3.5
-      ctx.beginPath()
-      for (let y = horizon; y <= h + 6; y += 6) {
-        const chop = Math.sin(y * 0.12 + t * 0.003 + 1) * chopAmp * riverT(y)
-        ctx.lineTo(centerX(y) - halfWidth(y) + chop, y)
+      const bankPoly = (pad: number, chopAmp: number, phase: number) => {
+        ctx.beginPath()
+        for (const sp of path) {
+          const chop = Math.sin(sp.u * 40 + t * 0.003 + phase) * chopAmp * sp.s
+          const d = sp.hw + pad + chop
+          ctx.lineTo(sp.x + d * sp.nx, sp.y + d * sp.ny)
+        }
+        for (let i = N; i >= 0; i--) {
+          const sp = path[i]
+          const chop = Math.sin(sp.u * 37 - t * 0.0025 + phase + 2) * chopAmp * sp.s
+          const d = sp.hw + pad + chop
+          ctx.lineTo(sp.x - d * sp.nx, sp.y - d * sp.ny)
+        }
+        ctx.closePath()
       }
-      for (let y = h + 6; y >= horizon; y -= 6) {
-        const chop = Math.sin(y * 0.1 - t * 0.0025 + 3) * chopAmp * riverT(y)
-        ctx.lineTo(centerX(y) + halfWidth(y) - chop, y)
-      }
-      ctx.closePath()
-      const water = ctx.createLinearGradient(0, horizon, 0, h)
+      // wet earth at the edge
+      bankPoly(5, 0.4, 0)
+      ctx.fillStyle = rgbCss(lerpRgb(p.bank, p.waterDeep, 0.45))
+      ctx.fill()
+      // the water, lit from upstream (far, hazy) to downstream (near, deep)
+      bankPoly(0, 0.6 + sev * 3.5, 1)
+      const water = ctx.createLinearGradient(path[0].x, path[0].y, path[N].x, path[N].y)
       water.addColorStop(0, rgbCss(lerpRgb(p.water, p.skyBottom, 0.3)))
       water.addColorStop(1, rgbCss(p.waterDeep))
       ctx.fillStyle = water
       ctx.fill()
-
-      // the deep channel down the middle
+      // deep channel
       ctx.beginPath()
-      for (let y = horizon; y <= h + 6; y += 8) ctx.lineTo(centerX(y) - halfWidth(y) * 0.5, y)
-      for (let y = h + 6; y >= horizon; y -= 8) ctx.lineTo(centerX(y) + halfWidth(y) * 0.5, y)
+      for (const sp of path) ctx.lineTo(sp.x + sp.hw * 0.45 * sp.nx, sp.y + sp.hw * 0.45 * sp.ny)
+      for (let i = N; i >= 0; i--) {
+        const sp = path[i]
+        ctx.lineTo(sp.x - sp.hw * 0.45 * sp.nx, sp.y - sp.hw * 0.45 * sp.ny)
+      }
       ctx.closePath()
-      ctx.fillStyle = rgbCss(p.waterDeep, 0.35)
+      ctx.fillStyle = rgbCss(p.waterDeep, 0.3)
       ctx.fill()
+      // the upper bank catches the light — the cue that the land steps down
+      ctx.strokeStyle = rgbCss(lerpRgb(p.bank, FOAM, 0.3), 0.45)
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      for (const sp of path) ctx.lineTo(sp.x + (sp.hw + 6) * sp.nx, sp.y + (sp.hw + 6) * sp.ny)
+      ctx.stroke()
 
-      // flow streaks — the current, moving toward the viewer
+      // flow — the current, running downstream along the tangent
       const speed = 0.00006 + sev * 0.00022
       for (let i = 0; i < scenery.streaks.length; i++) {
-        const s = scenery.streaks[i]
-        const prog = (s.phase + t * speed) % 1
-        const y = horizon + prog * span
-        const r = riverT(y)
-        const x = centerX(y) + s.lane * halfWidth(y) * 0.92
-        const len = (4 + r * 24) * s.len
+        const st = scenery.streaks[i]
+        const u = (st.phase + t * speed) % 1
+        const { x, y, sp } = pointAt(u, st.lane * 0.9)
+        // Whitecaps are short, bright flecks; the long soft streaks are the
+        // current itself. Long bright strokes read as debris, not water.
         const whitecap = sev > 0.5 && i % 3 === 0
-        ctx.strokeStyle = rgbCss(FOAM, (whitecap ? 0.55 : 0.18 + sev * 0.22) * (0.3 + r))
-        ctx.lineWidth = 0.8 + r * 1.2
+        const len = (whitecap ? 2 + sp.s * 5 : 5 + sp.s * 16) * st.len
+        const nearDrop = DROPS.some((d) => Math.abs(u - d) < 0.07) ? 1.6 : 1
+        ctx.strokeStyle = rgbCss(FOAM, Math.min(0.85, (whitecap ? 0.5 : 0.14 + sev * 0.18) * nearDrop))
+        ctx.lineWidth = whitecap ? 1.2 + sp.s * 1.2 : 0.8 + sp.s * 0.8
         ctx.beginPath()
         ctx.moveTo(x, y)
-        ctx.lineTo(x + wind * 0.5, y + len)
+        ctx.lineTo(x + sp.tx * len, y + sp.ty * len)
         ctx.stroke()
-        if (whitecap) {
+      }
+
+      // the drops: a lip, a foam line, and a churn below — the stream descends
+      for (const d of DROPS) {
+        const sp = sampleAt(d)
+        const a = { x: sp.x + sp.hw * sp.nx, y: sp.y + sp.hw * sp.ny }
+        const b = { x: sp.x - sp.hw * sp.nx, y: sp.y - sp.hw * sp.ny }
+        ctx.strokeStyle = rgbCss(lerpRgb(p.waterDeep, [0, 0, 0], 0.35), 0.7)
+        ctx.lineWidth = 2 * sp.s
+        ctx.beginPath()
+        ctx.moveTo(a.x - sp.tx * 2, a.y - sp.ty * 2)
+        ctx.lineTo(b.x - sp.tx * 2, b.y - sp.ty * 2)
+        ctx.stroke()
+        ctx.strokeStyle = rgbCss(FOAM, 0.55 + sev * 0.35)
+        ctx.lineWidth = 2.5 * sp.s
+        ctx.beginPath()
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+        ctx.stroke()
+        ctx.lineWidth = 1 + sp.s
+        for (let k = -3; k <= 3; k++) {
+          const lane = k / 3.6
+          const { x, y } = pointAt(d + 0.012, lane)
+          const len = (8 + sev * 10) * sp.s * (0.7 + rnd(k + 10, 30) * 0.6)
+          const jitter = Math.sin(t * 0.01 + k) * 1.5
+          ctx.strokeStyle = rgbCss(FOAM, 0.3 + sev * 0.3)
           ctx.beginPath()
-          ctx.moveTo(x - 4 * r, y + len * 0.3)
-          ctx.lineTo(x + 4 * r, y + len * 0.3 + 1)
+          ctx.moveTo(x, y)
+          ctx.lineTo(x + sp.tx * len + jitter, y + sp.ty * len)
           ctx.stroke()
         }
       }
 
-      // rocks, with foam once the water gets pushy
-      const foamAlpha = clamp01((sev - 0.35) * 1.6)
+      // rocks — most in the rapids — plus the big one
+      const foamAlpha = clamp01((sev - 0.3) * 1.5)
       const rockColor = lerpRgb(p.waterDeep, [0, 0, 0], 0.4)
-      for (const rk of scenery.rocks) {
-        const y = ground(rk.v)
-        const r = riverT(y)
-        const x = centerX(y) + rk.lane * halfWidth(y) * 0.8
-        const size = (3 + r * 11) * rk.size
+      const drawRock = (u: number, lane: number, sizeMul: number) => {
+        const { x, y, sp } = pointAt(u, lane)
+        const size = (3 + sp.s * 9) * sizeMul
+        const ang = Math.atan2(sp.ty, sp.tx)
+        ctx.save()
+        ctx.translate(x, y)
+        ctx.rotate(ang)
         ctx.fillStyle = rgbCss(rockColor)
         ctx.beginPath()
-        ctx.ellipse(x, y, size, size * 0.6, 0, 0, Math.PI * 2)
+        ctx.ellipse(0, 0, size, size * 0.6, 0, 0, Math.PI * 2)
         ctx.fill()
         ctx.fillStyle = rgbCss(lerpRgb(rockColor, FOAM, 0.12))
         ctx.beginPath()
-        ctx.ellipse(x - size * 0.3, y - size * 0.25, size * 0.35, size * 0.15, 0, 0, Math.PI * 2)
+        ctx.ellipse(-size * 0.3, -size * 0.25, size * 0.35, size * 0.15, 0, 0, Math.PI * 2)
         ctx.fill()
         if (foamAlpha > 0.01) {
-          const wobble = Math.sin(t * 0.008 + rk.v * 9) * 0.8
-          // A soft bow-wave upstream (toward the horizon) and two wake streaks
-          // downstream. Never a ring around the rock — that reads as an eye.
+          const wobble = Math.sin(t * 0.008 + u * 9) * 0.8
           ctx.fillStyle = rgbCss(FOAM, foamAlpha * 0.45)
           ctx.beginPath()
-          ctx.ellipse(x, y - size * 0.75 + wobble, size * 0.9, size * 0.28, 0, 0, Math.PI * 2)
+          ctx.ellipse(-size * 0.85 + wobble, 0, size * 0.3, size * 0.8, 0, 0, Math.PI * 2)
           ctx.fill()
           ctx.strokeStyle = rgbCss(FOAM, foamAlpha * 0.5)
-          ctx.lineWidth = 1 + r
+          ctx.lineWidth = 1 + sp.s
           for (const dir of [-1, 1]) {
             ctx.beginPath()
-            ctx.moveTo(x + dir * size * 0.9, y + size * 0.2)
-            ctx.lineTo(x + dir * size * 1.4 + wobble, y + size * 2.4)
+            ctx.moveTo(size * 0.3, dir * size * 0.6)
+            ctx.lineTo(size * 2.4 + wobble, dir * size * 0.95)
             ctx.stroke()
           }
         }
+        ctx.restore()
+        return { x, y, size, sp }
       }
+      for (const rk of scenery.rocks) drawRock(rk.u, rk.lane, rk.size)
+      const bigRock = drawRock(BIG_ROCK.u, BIG_ROCK.lane, BIG_ROCK.size)
 
-      // reeds along both banks, leaning with the wind
-      ctx.lineCap = 'round'
+      // reeds along both banks
       for (const rd of scenery.reeds) {
-        const y = ground(rd.v)
-        const r = riverT(y)
-        const x = centerX(y) + rd.side * (halfWidth(y) + 3 + rd.off * 16 * (0.5 + r))
-        const hgt = (6 + r * 28) * rd.h
+        const { x, y, sp } = pointAt(rd.u, rd.side * (1.08 + rd.off * 0.5))
+        const hgt = (6 + sp.s * 24) * rd.h
         const bend = (wind + Math.sin(t * 0.002 + rd.phase) * 0.4) * hgt * 0.35
         ctx.strokeStyle = rgbCss(lerpRgb(p.foliage, FOAM, 0.12), 0.9)
-        ctx.lineWidth = 1 + r
+        ctx.lineWidth = 0.8 + sp.s
         for (const b of [-1, 0, 1]) {
           ctx.beginPath()
           ctx.moveTo(x + b * 1.5, y)
           ctx.quadraticCurveTo(
             x + bend * 0.5 + b * 2,
             y - hgt * 0.55,
-            x + bend + b * 4 * r,
+            x + bend + b * 3 * sp.s,
             y - hgt * (0.85 + 0.15 * Math.abs(b)),
           )
           ctx.stroke()
@@ -475,41 +595,95 @@ export default function RiverCanvas({ scene, members }: Props) {
             ctx.strokeStyle = `rgba(232, 200, 126, ${lightningFlash})`
             ctx.lineWidth = 2
             ctx.beginPath()
-            ctx.moveTo(bx, horizon * 0.2)
+            ctx.moveTo(bx, horizon * 0.15)
             ctx.lineTo(bx - 12, horizon * 0.5)
-            ctx.lineTo(bx + 6, horizon * 0.65)
-            ctx.lineTo(bx - 8, horizon * 1.02)
+            ctx.lineTo(bx + 6, horizon * 0.7)
+            ctx.lineTo(bx - 8, horizon * 1.05)
             ctx.stroke()
           }
           lightningFlash *= 0.86
         }
       }
 
-      // --- avatars: fixed slots down the stream, far ones first ------------
-      // The bottom third of the frame belongs to the scene name, so slots stop
-      // short of it. Narrow frames zig-zag across the stream to keep names apart.
+      // --- avatars: named spots, or drifting slots down the stream ---------
+      type Placed = { m: RiverMember; x: number; y: number; s: number; onLand: boolean; i: number }
+      const placed: Placed[] = []
       const list = membersRef.current
-      const narrow = w < 600
-      const lanes = narrow ? [-0.6, 0.6, 0] : [-0.42, 0.4, 0, -0.22, 0.24, -0.48, 0.46]
-      const vStart = narrow ? 0.16 : 0.2
-      const vSpan = narrow ? 0.48 : 0.48
-      list.forEach((m, i) => {
-        const v = vStart + ((i + 0.5) / list.length) * vSpan
-        const y = ground(v)
-        const r = riverT(y)
-        const x = centerX(y) + lanes[i % lanes.length] * halfWidth(y) * 0.8
-        const s = 0.55 + r * 0.8
-        const bob = reducedMotion.matches
-          ? 0
-          : Math.sin(t * 0.002 * (1 + sev * 2) + i * 1.7) * (1 + sev * 6) * s
-        // On a phone, six name tags in a 140px stream can't all fit — keep
-        // yours; the team tab names everyone.
-        drawAvatar(ctx, m, x, y + bob, t, i, s, !narrow || m.isMe)
+      const bySpot = new Map<Spot, RiverMember[]>()
+      list.forEach((m) => bySpot.set(m.spot, [...(bySpot.get(m.spot) ?? []), m]))
+      const fan = (k: number, n: number) => (k - (n - 1) / 2) * 11
+
+      const anchor = (spot: Spot, k: number, n: number) => {
+        switch (spot) {
+          case 'headwater': {
+            const { x, y, sp } = pointAt(0.1, 0)
+            return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
+          }
+          case 'rapids': {
+            const { x, y, sp } = pointAt(0.47, -0.15)
+            return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
+          }
+          case 'rock': {
+            const s = bigRock.sp.s
+            return {
+              x: bigRock.x + fan(k, n) * s * 0.8,
+              y: bigRock.y - bigRock.size * 0.55,
+              s,
+              onLand: true,
+            }
+          }
+          case 'shade': {
+            const s = bigTree.s * 0.7
+            return { x: bigTree.x - 12 * bigTree.s + fan(k, n) * s, y: bigTree.y + 6 * bigTree.s, s, onLand: true }
+          }
+          case 'shallows': {
+            const { x, y, sp } = pointAt(0.74, -0.82)
+            return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
+          }
+          case 'eddy': {
+            const { x, y, sp } = pointAt(0.9, 0.25)
+            return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
+          }
+          default:
+            return null
+        }
+      }
+
+      let gi = 0
+      for (const [spot, group] of bySpot) {
+        if (spot === 'drift') continue
+        group.forEach((m, k) => {
+          const a = anchor(spot, k, group.length)
+          if (a) placed.push({ m, ...a, i: gi++ })
+        })
+      }
+      const drifters = bySpot.get('drift') ?? []
+      const lanes = narrow ? [-0.55, 0.55, 0] : [-0.4, 0.4, 0, -0.2, 0.2]
+      drifters.forEach((m, k) => {
+        const u = 0.14 + ((k + 0.5) / drifters.length) * 0.78
+        const { x, y, sp } = pointAt(u, lanes[k % lanes.length])
+        placed.push({ m, x, y, s: sp.s, onLand: false, i: gi++ })
       })
+
+      placed.sort((a, b) => a.y - b.y)
+      for (const pl of placed) {
+        const bob =
+          reducedMotion.matches || pl.onLand
+            ? 0
+            : Math.sin(t * 0.002 * (1 + sev * 2) + pl.i * 1.7) * (1 + sev * 5) * pl.s
+        if (pl.onLand) {
+          ctx.fillStyle = 'rgba(10, 14, 18, 0.25)'
+          ctx.beginPath()
+          ctx.ellipse(pl.x, pl.y + 3 * pl.s, 8 * pl.s, 2.5 * pl.s, 0, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        // On a phone, seven name tags can't fit — keep yours; the team tab
+        // names everyone.
+        drawAvatar(ctx, pl.m, pl.x, pl.y + bob, t, pl.i, pl.s, !narrow || pl.m.isMe)
+      }
     }
 
     const drawStatic = () => {
-      // Reduced motion: crossfade between stills instead of animating.
       const octx = overlay.getContext('2d')
       if (octx) {
         octx.setTransform(1, 0, 0, 1, 0, 0)
@@ -522,7 +696,6 @@ export default function RiverCanvas({ scene, members }: Props) {
           overlay.style.opacity = '0'
         })
       }
-      // Jump the tween to its end and draw one settled frame.
       tweenRef.current.start = -TWEEN_MS
       draw(performance.now())
     }
@@ -533,7 +706,6 @@ export default function RiverCanvas({ scene, members }: Props) {
       raf = requestAnimationFrame(loop)
       if (now - lastFrame < FRAME_MS) return
       lastFrame = now
-      // Self-heal on zoom / monitor moves: dpr changes don't fire ResizeObserver.
       if (currentDpr() !== dpr) size()
       draw(now)
     }
@@ -545,7 +717,6 @@ export default function RiverCanvas({ scene, members }: Props) {
     })
     ro.observe(wrap)
 
-    // Don't burn frames nobody can see: background tab or scrolled away.
     let inView = true
     const startOrStop = () => {
       cancelAnimationFrame(raf)
@@ -573,8 +744,6 @@ export default function RiverCanvas({ scene, members }: Props) {
     }
   }, [])
 
-  // Under reduced motion the loop isn't running, so scene/member changes
-  // need an explicit still-frame redraw (with the old frame crossfading out).
   useEffect(() => {
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const id = setTimeout(() => drawStaticRef.current?.())
@@ -632,7 +801,6 @@ function drawAvatar(
     }
     case 'struck': {
       head(ctx, 0, -8, '#6a6f75')
-      // a periodic re-strike, because comedy is timing
       if ((t + i * 700) % 3400 < 220) {
         ctx.strokeStyle = SUN_CSS
         ctx.lineWidth = 2
@@ -686,7 +854,6 @@ function drawAvatar(
   }
   ctx.restore()
 
-  // name tag, unscaled so it stays legible at the far end
   if (showName) {
     ctx.globalAlpha = 1
     ctx.font = '10.5px system-ui, sans-serif'
