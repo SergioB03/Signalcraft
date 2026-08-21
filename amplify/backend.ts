@@ -13,11 +13,13 @@ import {
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { computeWeather } from './functions/compute-weather/resource';
+import { resetDemo } from './functions/reset-demo/resource';
 
 const backend = defineBackend({
   auth,
   data,
   computeWeather,
+  resetDemo,
 });
 
 // --- Weather trigger: Ping table stream → compute-weather Lambda ---------

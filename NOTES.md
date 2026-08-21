@@ -194,6 +194,37 @@ Haiku 4.5 → report readable by the lead). Production is seeded past the
 anonymity floor and has demo accounts. Every Tier 1 and Tier 2 feature works
 on the public URL. Remaining: video, article, submission form.
 
+### Late-night scope round: test environment, team page, five-member cast, design pass
+
+The developer asked for a fuller "shipped app" feel the night before deadline.
+Costed each ask against the remaining hours and held the spec's lines
+(multi-team / invites stay Tier 3):
+
+- **Tabs without a router.** river / team / report / dev, role-filtered, keyed
+  on the URL hash so refresh, back button, and deep links just work. The river
+  stays mounted as the hero on every tab — it's the app's thesis, and keeping
+  the canvas mounted means tab-switching can't disturb subscriptions or the
+  tween.
+- **Team page for leads**: roster with poses and join dates, participation in
+  the last 24h (a count, never who), and a two-step remove-member action.
+  One auth-rule addition: `allow.group('lead').to(['delete'])` on Membership.
+- **Test environment**: a `dev` Cognito group and a `resetDemoDay` custom
+  mutation backed by a TypeScript Lambda with IAM data access — forget today's
+  receipts, wipe the river, or wipe-and-reseed. The in-app dev tab and
+  `scripts/reset-demo.ts` call the same mutation. Because Ping deletes flow
+  through the table stream (and the weather Lambda now handles REMOVE),
+  wiping the river makes the weather recompute itself — no special-casing.
+- **Five-member cast** with names and poses (ana the lead, kai, mira, theo,
+  june) seeded by signing in as each so Membership rows stay owner-correct.
+- **Design pass**: Fraunces display face, pill tabs, card panels on a gradient
+  ground, vignette behind the scene name, two-column pose/ping layout, honest
+  empty and loading states, light theme with white cards.
+- **"Clicking between pages, nothing breaks" as a script**: headless Edge signs
+  in as member, lead, and dev; visits every tab forward and back; deep-links
+  and refreshes on a non-default tab; toggles theme both ways; round-trips a
+  pose change; signs out and back in; and a stranger walks the sign-up form.
+  Any console or page error fails the run.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root

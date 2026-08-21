@@ -4,6 +4,7 @@
 :root,
 :root[data-theme='dark'] {
   --silt: #1b2027;
+  --silt-deep: #13181e;
   --stone: #2e3944;
   --reed: #5e7c6b;
   --sun: #e8c87e;
@@ -16,7 +17,8 @@
    focus ring and ping confirmation vanish into the pale background */
 :root[data-theme='light'] {
   --silt: #edf1f3;
-  --stone: #dce3e8;
+  --silt-deep: #e2e8ec;
+  --stone: #ffffff;
   --foam: #1b2027;
   --sun: #8a6a1f;
   --clay: #8a4d2e;
@@ -29,7 +31,10 @@
 
 body {
   margin: 0;
+  min-height: 100svh;
   background: var(--silt);
+  background-image: linear-gradient(180deg, var(--silt) 0%, var(--silt-deep) 100%);
+  background-attachment: fixed;
   color: var(--foam);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   line-height: 1.5;

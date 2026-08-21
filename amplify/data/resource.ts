@@ -1,5 +1,6 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { computeWeather } from '../functions/compute-weather/resource';
+import { resetDemo } from '../functions/reset-demo/resource';
 
 /**
  * The anonymity split is the most important design decision in this app:
@@ -34,7 +35,12 @@ const schema = a
         // Self-selected, never derived from mood data.
         avatarPose: a.enum(['floating', 'raft', 'underwater', 'struck', 'coconut', 'waving']),
       })
-      .authorization((allow) => [allow.authenticated().to(['read']), allow.owner()]),
+      // Everyone sees the roster; you edit only yourself; leads can remove.
+      .authorization((allow) => [
+        allow.authenticated().to(['read']),
+        allow.owner(),
+        allow.group('lead').to(['delete']),
+      ]),
 
     Ping: a
       .model({
@@ -93,10 +99,19 @@ const schema = a
         teamId: a.id().required(),
       })
       .authorization((allow) => [allow.group('lead')]),
+
+    // Test-environment control for the dev group: forget today's receipts so
+    // demo accounts can ping again, or wipe / reseed the whole river.
+    resetDemoDay: a
+      .mutation()
+      .arguments({ teamId: a.id().required(), scope: a.string() })
+      .returns(a.json())
+      .authorization((allow) => [allow.group('dev')])
+      .handler(a.handler.function(resetDemo)),
   })
-  // The weather Lambda talks to this API with IAM auth so its WeatherState
-  // writes are AppSync mutations — which is what makes subscriptions fire.
-  .authorization((allow) => [allow.resource(computeWeather)]);
+  // Lambdas talk to this API with IAM auth so their writes are AppSync
+  // mutations — which is what makes subscriptions fire.
+  .authorization((allow) => [allow.resource(computeWeather), allow.resource(resetDemo)]);
 
 export type Schema = ClientSchema<typeof schema>;
 

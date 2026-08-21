@@ -46,10 +46,28 @@ npx ampx sandbox        # deploys a personal cloud backend, writes amplify_outpu
 npm run dev             # http://localhost:5173
 ```
 
-Useful scripts (all `npx tsx scripts/<name>.ts`, credentials via
-`TEST_EMAIL`/`TEST_PASSWORD` env vars):
+### Demo cast
 
-- `seed-demo.ts` — seed a day of demo pings past the anonymity floor
-- `prove-realtime.ts` — end-to-end proof: ping → stream → Lambda → AppSync
-  mutation → subscription event, pass/fail in 30s
-- `prove-report.ts` — end-to-end proof of the Bedrock report path (lead account)
+Five demo accounts share one team (`demoN@undercurrent.local`, ask for the
+password). `demo1` is **ana**, the lead — she sees the **report** tab and can
+remove members from the **team** tab. `demo2`–`demo5` are kai, mira, theo, and
+june. A sixth account, `dev@undercurrent.local`, is in the `dev` group and gets
+the **dev** tab: forget today's pings so accounts can ping again, wipe the
+river, or wipe-and-reseed a fresh presentable day. Anyone can sign up with a
+real email and join the same river.
+
+Tabs live in the URL hash (`#team`, `#report`, `#dev`), so refresh, back, and
+deep links behave with no router.
+
+### Scripts
+
+All `npx tsx scripts/<name>.ts`; set `OUTPUTS=<path>` to target another
+backend's `amplify_outputs.json` (defaults to the local sandbox).
+
+| Script | Env | What it proves / does |
+|---|---|---|
+| `prove-realtime.ts` | `TEST_EMAIL`, `TEST_PASSWORD` | ping → stream → Lambda → AppSync mutation → subscription event, pass/fail in 30s |
+| `prove-report.ts` | lead account creds | button-as-a-row → Python Lambda → Bedrock → Report readable by the lead; fails on fallback bodies |
+| `seed-demo.ts` | any member creds | a day of demo pings past the anonymity floor |
+| `seed-members.ts` | `DEMO_PASSWORD` | names and poses for the five-member cast |
+| `reset-demo.ts [receipts\|all\|reseed]` | `DEV_EMAIL`, `DEV_PASSWORD` | the terminal twin of the dev tab |
