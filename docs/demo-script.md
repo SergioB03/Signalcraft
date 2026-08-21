@@ -4,10 +4,20 @@ Two browser windows side by side (`Win+←` / `Win+→`). **Left: a normal windo
 signed in as `demo1` (ana, the lead). Right: an InPrivate/Incognito window
 signed in as `demo2` (kai).** Tabs share a login; private windows don't.
 
-Before recording: on the **dev** tab (sign in as `dev@…` in a third private
-window, or run `npx tsx scripts/reset-demo.ts reseed`) run **wipe and reseed**
-so the river is past the floor and nobody has pinged today. Then close the dev
-window.
+Before recording, **on the public URL** (the sandbox is a different backend —
+the in-app button is the safe path):
+
+1. In a third private window, sign in as `dev@undercurrent.local` → **dev** tab
+   → **wipe and reseed**. The river is now past the floor, nobody has pinged
+   today, and any existing report is kept.
+2. Switch that window to the **report** tab and press **generate current
+   report** once, so a finished report exists as the fallback for beat 5.
+3. Close the dev window.
+
+(Terminal equivalent, if you must: `OUTPUTS=<path to the main branch's
+amplify_outputs.json> DEV_EMAIL=dev@undercurrent.local DEV_PASSWORD=…
+npx tsx scripts/reset-demo.ts reseed` — without `OUTPUTS` it resets the local
+sandbox, not the public river.)
 
 | t | Beat | What the viewer sees |
 |---|---|---|
@@ -18,6 +28,8 @@ window.
 | 40–55s | **Left window, report tab: generate current report.** | The button spins "reading the water…", then a 3–4 sentence read of the week and one suggested action appear — written by Claude on Bedrock from aggregates only. |
 | 55–60s | **Toggle the theme, land back on the river.** | Daylight / dusk flip; the river stays itself. End on the scene name. |
 
-Fallbacks: if the report takes longer than ~20s, cut to a pre-generated one
-(the panel shows the latest report on load). If a ping reads "already pinged
-today", the dev tab's **forget today's pings** clears it in two seconds.
+Fallbacks: if the report takes longer than ~20s, cut to the pre-generated one
+from prep step 2 (the panel shows the latest report on load). If a ping reads
+"already pinged today", run the dev tab's **forget today's pings**, then in the
+pinging window click **think that's wrong? try again** (or switch to the team
+tab and back) — the card doesn't refresh on its own.

@@ -10,14 +10,15 @@ const client = generateClient<Schema>();
 
 type Scope = 'receipts' | 'all' | 'reseed';
 
+// Five, not seven: the demo roster is about seven people, and the team tab
+// shows ping count beside member count at the one-ping-a-day beat.
+// 4,3,4,2,5 averages 3.6 (breezy); one low live ping tips it to overcast.
 const SEEDS: Array<{ score: number; note?: string }> = [
   { score: 4, note: 'shipped the migration, feeling good' },
   { score: 3 },
   { score: 4, note: 'nice quiet focus day' },
   { score: 2, note: 'meetings ate the whole morning again' },
   { score: 5, note: 'pairing session actually fixed it!' },
-  { score: 3, note: 'fine. tired. friday-shaped.' },
-  { score: 4 },
 ];
 
 /**
@@ -26,7 +27,10 @@ const SEEDS: Array<{ score: number; note?: string }> = [
  * all      — receipts + every ping, report, and report request. Ping deletes
  *            flow through the table stream, so the weather recomputes itself
  *            back to "gathering".
- * reseed   — `all`, then a fresh day of demo pings past the anonymity floor.
+ * reseed   — receipts + pings, then a fresh day of demo pings past the
+ *            anonymity floor. Reports are kept: the demo's fallback is
+ *            "show the latest report", and a reseed right before recording
+ *            must not erase it.
  */
 export const handler: Schema['resetDemoDay']['functionHandler'] = async (event) => {
   const { teamId } = event.arguments;
@@ -44,6 +48,9 @@ export const handler: Schema['resetDemoDay']['functionHandler'] = async (event) 
       (nextToken) => client.models.Ping.list({ ...byTeam, nextToken }),
       (id) => client.models.Ping.delete({ id }),
     );
+  }
+
+  if (scope === 'all') {
     counts.reports = await deleteAll(
       (nextToken) => client.models.Report.list({ ...byTeam, nextToken }),
       (id) => client.models.Report.delete({ id }),

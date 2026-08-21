@@ -25,14 +25,13 @@ const outputs = JSON.parse(
 
 const TEAM_ID = 'demo-team'
 
+// Mirrors the reset Lambda's reseed: five pings, average 3.6 (breezy).
 const SEEDS: Array<{ score: number; note?: string }> = [
   { score: 4, note: 'shipped the migration, feeling good' },
   { score: 3 },
   { score: 4, note: 'nice quiet focus day' },
   { score: 2, note: 'meetings ate the whole morning again' },
   { score: 5, note: 'pairing session actually fixed it!' },
-  { score: 3, note: 'fine. tired. friday-shaped.' },
-  { score: 4 },
 ]
 
 const email = process.env.TEST_EMAIL

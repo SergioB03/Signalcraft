@@ -231,10 +231,11 @@ export default function RiverCanvas({ scene, members }: Props) {
         path.push({
           u,
           x: lerp(-0.06 * w, 1.06 * w, u),
+          // narrow frames end the stream higher, clear of the scene caption
           y:
             horizon +
             h * 0.07 +
-            (h - horizon - h * 0.16) * u ** 1.08 +
+            (h - horizon - h * (narrow ? 0.3 : 0.16)) * u ** 1.08 +
             Math.sin(u * 6.5 + 1.2) * h * 0.035,
           tx: 0,
           ty: 0,
@@ -637,11 +638,11 @@ export default function RiverCanvas({ scene, members }: Props) {
             return { x: bigTree.x - 12 * bigTree.s + fan(k, n) * s, y: bigTree.y + 6 * bigTree.s, s, onLand: true }
           }
           case 'shallows': {
-            const { x, y, sp } = pointAt(0.74, -0.82)
+            const { x, y, sp } = pointAt(narrow ? 0.64 : 0.74, -0.82)
             return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           case 'eddy': {
-            const { x, y, sp } = pointAt(0.9, 0.25)
+            const { x, y, sp } = pointAt(narrow ? 0.82 : 0.9, 0.25)
             return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
           }
           default:
@@ -677,9 +678,10 @@ export default function RiverCanvas({ scene, members }: Props) {
           ctx.ellipse(pl.x, pl.y + 3 * pl.s, 8 * pl.s, 2.5 * pl.s, 0, 0, Math.PI * 2)
           ctx.fill()
         }
-        // On a phone, seven name tags can't fit — keep yours; the team tab
-        // names everyone.
-        drawAvatar(ctx, pl.m, pl.x, pl.y + bob, t, pl.i, pl.s, !narrow || pl.m.isMe)
+        // On a phone, seven name tags can't fit — keep yours (unless it would
+        // land in the caption band); the team tab names everyone.
+        const nameFits = !narrow || (pl.m.isMe && pl.y + 14 * pl.s + 10 < h - 100)
+        drawAvatar(ctx, pl.m, pl.x, pl.y + bob, t, pl.i, pl.s, nameFits)
       }
     }
 
@@ -704,7 +706,10 @@ export default function RiverCanvas({ scene, members }: Props) {
     let lastFrame = 0
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop)
-      if (now - lastFrame < FRAME_MS) return
+      // The 1ms slack matters: two 60Hz vsyncs sum to 33.3ms, which rounds
+      // under 33.333 most of the time and would skip to a juddery 3-vsync
+      // cadence (~20fps) without it.
+      if (now - lastFrame < FRAME_MS - 1) return
       lastFrame = now
       if (currentDpr() !== dpr) size()
       draw(now)

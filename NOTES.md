@@ -315,7 +315,35 @@ the land. Final visual round before the freeze:
   land don't bob and cast a small shadow. Several people on one spot fan out.
 - Whitecaps are short flecks; long bright strokes read as debris in a storm.
 - Layout bonus: the river ends in the lower right, the scene name lives in
-  the lower left, so they never fight — on any screen width.
+  the lower left, so they rarely fight; on phones the stream ends higher and
+  the two downstream spots move upstream so the caption band stays clear.
+
+### Second review pass over the delta (Fri ~4 AM): 18 agents, 9 confirmed
+
+Everything since the first review got the same adversarial treatment. Fixed:
+
+- **Second-tab sign-in dead-end.** A tab left on the sign-in form while another
+  tab signed in would throw Amplify's raw "There is already a signed in user"
+  with no way forward. Now: the cross-tab reload guard lives at the app root
+  (not just inside the river), and that specific error simply proceeds — the
+  tokens are valid.
+- **No way to resend a confirmation code** — a spam-filtered email stranded a
+  real sign-up with no in-app exit. Added "send a new code".
+- **The 30fps gate was really ~20fps.** Two 60Hz vsyncs sum to 33.3ms, which
+  rounds under 33.333 most of the time, skipping to a juddery 3-vsync cadence.
+  A 1ms slack fixes it (verified by the reviewer on a 240Hz panel and by
+  simulation at 60/120/144Hz).
+- **Reseed erased the report the shot list's fallback depends on.** Reseed
+  now keeps reports; the prep step generates one before recording.
+- **"Already pinged" didn't clear after a reset** — added an in-card retry.
+- Phone anchors for the shallows/eddy landed under the caption; moved
+  upstream, stream ends higher, name tag suppressed in the caption band.
+- Honest wording for remove-member (they rejoin on next sign-in), and the
+  removed user's own tab stops acting on a ghost id.
+- Five seed pings instead of seven, so the team tab never shows more pings
+  than members at the one-ping-a-day beat.
+- Shot list: the terminal reseed targets the sandbox unless `OUTPUTS` points
+  at production — spelled out, with the in-app button as the safe path.
 
 ### Decision: scaffold = Vite template + `create-amplify` on top
 

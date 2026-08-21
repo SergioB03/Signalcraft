@@ -50,7 +50,8 @@ npm run dev             # http://localhost:5173
 
 Five demo accounts share one team (`demoN@undercurrent.local`, ask for the
 password). `demo1` is **ana**, the lead — she sees the **report** tab and can
-remove members from the **team** tab. `demo2`–`demo5` are kai, mira, theo, and
+take someone off the river from the **team** tab (they rejoin on their next
+sign-in; there's no ban list in a hackathon). `demo2`–`demo5` are kai, mira, theo, and
 june. A sixth account, `dev@undercurrent.local`, is in the `dev` group and gets
 the **dev** tab: forget today's pings so accounts can ping again, wipe the
 river, or wipe-and-reseed a fresh presentable day. Anyone can sign up with a
