@@ -126,7 +126,11 @@
   right: 1.4rem;
   z-index: 1;
   color: #e6edf2;
-  text-shadow: 0 1px 10px rgba(10, 14, 18, 0.6);
+  /* the tight second shadow keeps the title legible when a pale cloud
+     drifts behind it */
+  text-shadow:
+    0 1px 10px rgba(10, 14, 18, 0.6),
+    0 0 2px rgba(10, 14, 18, 0.6);
   pointer-events: none;
 }
 

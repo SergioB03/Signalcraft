@@ -398,16 +398,90 @@ mean a static page. So: a **simulation** toggle, remembered per browser, on
 by default for real sign-ups and off for the cast, leads, and dev.
 
 - Six made-up teammates (rae, milo, sol, ivy, noor, beck) with random moods,
-  poses, and spots; the visitor is the seventh and last to ping. The river
-  opens at "gathering — 6 of 7 have pinged, your ping decides the weather";
-  their stone runs the seven scores through the same thresholds as the
-  Lambda (`sceneFor`, mirrored for the sandbox only — real weather is still
-  never computed in a browser) and the sky tweens to the answer. Reset
-  re-rolls the six; "ping again" keeps them.
-- Nothing touches the real team. Pose and spot still write to the visitor's
-  own membership, so they keep their place on the live river.
+  poses, and spots; the visitor is the seventh and last to ping. Six pings
+  already clear the five-ping floor, so the river opens showing real weather
+  and the visitor's stone *shifts* it — the seven scores run through the same
+  thresholds as the Lambda (`sceneFor`, mirrored for the sandbox only — real
+  weather is still never computed in a browser) and the sky tweens to the
+  answer. Reset re-rolls the six; "ping again" keeps them.
 - A persistent "preview build" pill says which mode you're in.
 - Login stays: tinkerers need an identity for the live mode and their spot.
+
+The pill first read "nothing here reaches a real team", which was a promise the
+code didn't keep: a visitor is still auto-joined to the demo team at bootstrap,
+so their membership is real even though their simulated pings never leave the
+browser. Changed to what is actually true — "your pings stay in this browser" —
+and the name editor is hidden while simulating, so nothing they type in the
+sandbox lands on the live roster. Copy that overclaims is worse than no copy.
+
+### Multi-window simulation (Fri ~2 PM): one browser, several teammates
+
+To record a live-looking team without seven accounts — and so a visitor can feel
+what the app does with other people in it — the simulated team is **shared by
+every window of one browser** while the *seat* you occupy is per window.
+
+- The team lives in `localStorage` and changes broadcast over a
+  `BroadcastChannel`, with a `storage` listener as the fallback.
+- Which of the seven seats a window drives lives in `sessionStorage`, which is
+  per window by definition. Open three windows, pick three seats, move three
+  people, and every window sees all of it.
+
+Three bugs came out of this, all found by driving two real windows:
+
+- **`Number(null)` is `0`.** The seat initializer read
+  `Number(sessionStorage.getItem('uc-sim-seat'))` and range-checked the result.
+  With no saved seat that yields `0` — a perfectly valid seat — so every first
+  window sat down in cast member #0's chair and inherited their ping. The
+  visitor's first sight was "you pinged 1 — the river went rough" before they
+  had touched anything, which quietly destroys the one premise the sandbox has.
+  Absent has to mean absent: check for `null` before coercing.
+- **A rolled team that was never written down.** The fresh six were only
+  persisted on the first *change*, so a second window opened before then rolled
+  its own six strangers and the two windows disagreed. The team is now written
+  at mount, and a window that finds someone else's team already there adopts it
+  instead of overwriting — otherwise the second window silently wins the race.
+- **A window driving someone else's seat still said "you pinged".** It now
+  names the seat: "rae pinged 1 — every window of this browser sees it."
+
+### Fixing what the showcase review found (Fri ~2 PM)
+
+An 18-agent pass driving the app through visitor use cases and viewports, with
+each finding independently verified before it counted:
+
+- **Simulation crashed the whole app to a blank page.** The new shared-state
+  code read `me` inside `riverMembers`, which is declared 24 lines further
+  down — a temporal dead zone that throws on every render while simulating.
+  Because the preference is remembered, every later load white-screened too,
+  and simulation is the *default for real sign-ups*: a community visitor would
+  have met a blank page and nothing else. TypeScript catches this; the dev
+  server strips types without checking them, which is exactly why the two
+  failing Playwright runs I'd been blaming on flakiness were the tests being
+  right. Declaration hoisted.
+- **Mode flipped after first paint.** `demoAccount` starts `null`, and
+  `null === false` is false, so a first-time visitor mounted in *live* mode and
+  swapped to the simulation ~400ms later — real river, real roster, then six
+  strangers. Undecided is now its own state: nothing mode-specific renders
+  until the email and the group memberships have both resolved.
+- **The simulation preference outlived the account.** It's browser-global, so
+  signing out and back in as the lead landed in the sandbox and the live demo
+  silently stopped working in that window. Cleared on sign-out.
+- **The team tab showed the live roster while the river was simulated** — real
+  names and remove buttons under a fake river. It now shows the seven seats,
+  with the seat this window drives marked.
+- **Avatars clipped by the bottom edge.** The relocation test only ran when the
+  panel was open, so with it collapsed nothing moved and the eddy occupant
+  (y ≈ 0.936h) was bisected at any height under ~1000px; with it open, the
+  sideways relocation changed only x, parking the avatar clipped beside the
+  panel. Off-frame is now blocked in its own right, and the limit it clamps to
+  leaves 56px of tail room — a name tag hangs ~40px below its anchor.
+- **"No report yet" flashed for ~200ms** before every fetched report. Absent
+  and not-yet-loaded are now different states.
+- **"Amplify has not been configured" on every load.** `generateClient()` runs
+  at module scope, and module evaluation beat the `Amplify.configure()` call in
+  `main.tsx`. Configuration moved into its own module imported first, which is
+  the only ordering guarantee ES modules give you.
+- The scene title got a second tight text-shadow so a pale cloud drifting
+  behind it can't swallow the word.
 
 ### Color and character (Fri ~4:30 AM): the people stop being stick figures
 

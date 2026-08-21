@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   confirmResetPassword,
   confirmSignUp,
@@ -72,6 +72,118 @@ function simCast(seed: number): SimMember[] {
 
 const isDemoEmail = (email?: string) => !!email && email.endsWith('@undercurrent.local')
 
+// One simulated river per browser, shared by every window of it: the team
+// lives in localStorage and changes broadcast over a BroadcastChannel. Which
+// SEAT a window occupies lives in sessionStorage, which is per window — so one
+// person can open three windows, be three teammates, and watch them move.
+type SimSeat = { id: string; displayName: string; pose: AvatarPose; spot: Spot; score: number | null }
+type SimState = { seed: number; seats: SimSeat[] }
+const SIM_KEY = 'uc-sim-state'
+const YOU_SEAT = 6
+
+function newSimState(seed: number): SimState {
+  return {
+    seed,
+    seats: [
+      ...simCast(seed),
+      { id: 'sim-you', displayName: 'you', pose: 'floating', spot: 'drift', score: null },
+    ],
+  }
+}
+
+function useSimState() {
+  const [simState, setState] = useState<SimState>(() => {
+    try {
+      const raw = localStorage.getItem(SIM_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as SimState
+        if (parsed?.seats?.length === 7) return parsed
+      }
+    } catch {
+      /* fall through to a fresh team */
+    }
+    return newSimState(Math.floor(Math.random() * 1e6))
+  })
+  const [seat, setSeatState] = useState<number>(() => {
+    try {
+      // Number(null) is 0 — an integer in range — so a window with no saved
+      // seat would silently sit in cast member #0's chair and inherit their
+      // ping. Absent must mean YOU_SEAT.
+      const raw = sessionStorage.getItem('uc-sim-seat')
+      const v = raw === null ? NaN : Number(raw)
+      return Number.isInteger(v) && v >= 0 && v < 7 ? v : YOU_SEAT
+    } catch {
+      return YOU_SEAT
+    }
+  })
+  const channel = useRef<BroadcastChannel | null>(null)
+  // Mirrors state for mount-only effects, without re-running them on change.
+  const latest = useRef(simState)
+  latest.current = simState
+
+  // A freshly rolled team is persisted immediately, so the next window joins
+  // THIS team instead of rolling its own six strangers. If another window won
+  // the race in between, adopt theirs.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SIM_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as SimState
+        if (parsed?.seats?.length === 7) {
+          setState(parsed)
+          return
+        }
+      }
+      localStorage.setItem(SIM_KEY, JSON.stringify(latest.current))
+    } catch {
+      /* the simulation still works, just window-local */
+    }
+  }, [])
+
+  useEffect(() => {
+    const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('uc-sim') : null
+    channel.current = bc
+    if (bc)
+      bc.onmessage = (e: MessageEvent<SimState>) => {
+        if (e.data?.seats?.length === 7) setState(e.data)
+      }
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== SIM_KEY || !e.newValue) return
+      try {
+        setState(JSON.parse(e.newValue) as SimState)
+      } catch {
+        /* ignore a torn write */
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      bc?.close()
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [])
+
+  const updateSim = (fn: (s: SimState) => SimState) =>
+    setState((prev) => {
+      const next = fn(prev)
+      try {
+        localStorage.setItem(SIM_KEY, JSON.stringify(next))
+      } catch {
+        /* still works within this window */
+      }
+      channel.current?.postMessage(next)
+      return next
+    })
+  const setSeat = (i: number) => {
+    setSeatState(i)
+    try {
+      sessionStorage.setItem('uc-sim-seat', String(i))
+    } catch {
+      /* per-window memory only */
+    }
+  }
+  return { simState, updateSim, seat, setSeat }
+}
+
 // ---------------------------------------------------------------------------
 // small hooks
 
@@ -118,17 +230,23 @@ function useHashView(available: View[]): [View, (v: View) => void] {
 }
 
 // Group membership rides inside the signed access token — no extra query.
+// `groupsReady` marks the moment the answer is known, so mode decisions
+// don't flip mid-render.
 function useGroups() {
-  const [groups, setGroups] = useState<string[]>([])
+  const [groups, setGroups] = useState<string[] | null>(null)
   useEffect(() => {
     fetchAuthSession()
       .then((session) => {
         const g = session.tokens?.accessToken.payload['cognito:groups']
         setGroups(Array.isArray(g) ? (g as string[]) : [])
       })
-      .catch(() => {})
+      .catch(() => setGroups([]))
   }, [])
-  return { isLead: groups.includes('lead'), isDev: groups.includes('dev') }
+  return {
+    isLead: !!groups?.includes('lead'),
+    isDev: !!groups?.includes('dev'),
+    groupsReady: groups !== null,
+  }
 }
 
 // Viewport facts the full-bleed layout needs: phone-width (the island becomes
@@ -419,7 +537,7 @@ function Home({
   theme: 'dark' | 'light'
   onToggleTheme: () => void
 }) {
-  const { isLead, isDev } = useGroups()
+  const { isLead, isDev, groupsReady } = useGroups()
   const views: View[] = [
     'ping',
     'you',
@@ -460,16 +578,22 @@ function Home({
       /* fine */
     }
   }
-  const [simSeed, setSimSeed] = useState(() => Math.floor(Math.random() * 1e6))
-  const [simScore, setSimScore] = useState<number | null>(null)
-  const cast = useMemo(() => simCast(simSeed), [simSeed])
-  const simScores = simScore === null ? cast.map((c) => c.score) : [...cast.map((c) => c.score), simScore]
-  const simScene: SceneName = simScore === null ? 'gathering' : sceneFor(simScores)
-  const simAvg = simScores.reduce((a, b) => a + b, 0) / simScores.length
-  const resetSim = () => {
-    setSimSeed(Math.floor(Math.random() * 1e6))
-    setSimScore(null)
-  }
+  const { simState, updateSim, seat, setSeat } = useSimState()
+  const mySeat = simState.seats[seat] ?? simState.seats[YOU_SEAT]
+  const simScore = mySeat.score
+  const simScores = simState.seats.map((s) => s.score).filter((x): x is number => x !== null)
+  const simPinged = simScores.length
+  const simScene: SceneName = sceneFor(simScores)
+  const simAvg = simPinged ? simScores.reduce((a, b) => a + b, 0) / simPinged : 0
+  const setSimScore = (score: number | null) =>
+    updateSim((s) => ({ ...s, seats: s.seats.map((x, i) => (i === seat ? { ...x, score } : x)) }))
+  const resetSim = () => updateSim(() => newSimState(Math.floor(Math.random() * 1e6)))
+  const setSimSeatField = (patch: Partial<SimSeat>) =>
+    updateSim((s) => ({ ...s, seats: s.seats.map((x, i) => (i === seat ? { ...x, ...patch } : x)) }))
+  // Until the account's email and groups are known, the mode is undecided —
+  // render neither live nor simulated chrome, so first-time visitors never
+  // see the live team flash before the simulation swaps in.
+  const modeReady = simPref !== null || (demoAccount !== null && groupsReady)
 
   // Make sure the demo team + my membership exist. Deterministic membership
   // id (`teamId#userId`) means StrictMode's double-run can't create dupes —
@@ -542,7 +666,11 @@ function Home({
 
   const scene = (weather?.scene ?? null) as SceneName | null
   const shownScene = preview ?? (sim ? simScene : scene)
-  const myPose = members.find((m) => m.id === myMembershipId)?.avatarPose ?? 'floating'
+  const myPose = sim
+    ? mySeat.pose
+    : (members.find((m) => m.id === myMembershipId)?.avatarPose ?? 'floating')
+  const me = members.find((m) => m.id === myMembershipId) ?? null
+
   const realMembers: RiverMember[] = members.map((m) => ({
     id: m.id,
     displayName: m.displayName,
@@ -551,14 +679,23 @@ function Home({
     isMe: m.userId === myUserId,
   }))
   const riverMembers: RiverMember[] = sim
-    ? [
-        ...cast.map((c) => ({ id: c.id, displayName: c.displayName, pose: c.pose, spot: c.spot, isMe: false })),
-        ...realMembers.filter((m) => m.isMe),
-      ]
+    ? simState.seats.map((s, i) => ({
+        id: s.id,
+        displayName: i === YOU_SEAT ? (me?.displayName ?? 'you') : s.displayName,
+        pose: s.pose,
+        spot: s.spot,
+        isMe: i === seat,
+      }))
     : realMembers
-  const mySpot = (members.find((m) => m.id === myMembershipId)?.spot ?? 'drift') as Spot
+  const mySpot = sim
+    ? mySeat.spot
+    : ((members.find((m) => m.id === myMembershipId)?.spot ?? 'drift') as Spot)
 
   const setSpot = async (spot: Spot) => {
+    if (sim) {
+      setSimSeatField({ spot })
+      return
+    }
     if (!myMembershipId) return
     setPoseError('')
     const { errors } = await client.models.Membership.update({ id: myMembershipId, spot })
@@ -568,9 +705,11 @@ function Home({
       )
   }
 
-  const me = members.find((m) => m.id === myMembershipId) ?? null
-
   const setPose = async (pose: AvatarPose) => {
+    if (sim) {
+      setSimSeatField({ pose })
+      return
+    }
     if (!myMembershipId) return
     setPoseError('')
     const { errors } = await client.models.Membership.update({ id: myMembershipId, avatarPose: pose })
@@ -601,16 +740,20 @@ function Home({
       <header className="viewport-header">
         <span className="dev-notice" role="status">
           <span className="notice-long">
-            {sim
-              ? 'preview build · simulated experience — nothing here reaches a real team'
-              : 'preview build · live demo team'}
+            {!modeReady
+              ? 'preview build'
+              : sim
+                ? 'preview build · simulated experience — your pings stay in this browser'
+                : 'preview build · live demo team'}
           </span>
-          <span className="notice-short">{sim ? 'simulated' : 'preview'}</span>
+          <span className="notice-short">{modeReady && sim ? 'simulated' : 'preview'}</span>
         </span>
         <span className="header-actions">
-          <button className="link" onClick={() => setSim(!sim)} aria-pressed={sim}>
-            {sim ? 'simulation: on' : 'simulate'}
-          </button>
+          {modeReady && (
+            <button className="link" onClick={() => setSim(!sim)} aria-pressed={sim}>
+              {sim ? 'simulation: on' : 'simulate'}
+            </button>
+          )}
           <button
             className="link"
             onClick={onToggleTheme}
@@ -618,7 +761,18 @@ function Home({
           >
             {theme === 'dark' ? 'daylight' : 'dusk'}
           </button>
-          <button className="link" onClick={() => signOut().then(onSignOut)}>
+          <button
+            className="link"
+            onClick={() => {
+              // the sim preference belongs to this account's visit, not the next one's
+              try {
+                localStorage.removeItem('uc-sim')
+              } catch {
+                /* fine */
+              }
+              signOut().then(onSignOut)
+            }}
+          >
             sign out
           </button>
         </span>
@@ -633,24 +787,27 @@ function Home({
                 {SCENES[preview].caption}.
               </>
             )}
-            {!preview && sim && simScore === null && (
-              <>
-                <span className="preview-pill">simulated</span>6 of 7 have pinged — you're the last
-                one. your ping decides the weather.
-              </>
-            )}
-            {!preview && sim && simScore !== null && (
+            {!preview && modeReady && sim && simScore === null && (
               <>
                 <span className="preview-pill">simulated</span>
-                {SCENES[simScene].caption} — 7 pings, average {simAvg.toFixed(1)}. you set this.
+                {simPinged} of 7 have pinged — {7 - simPinged === 1 ? "you're the last one" : 'your turn'}.
+                your ping decides the weather.
               </>
             )}
-            {!preview && !sim && scene === null && "nobody's pinged yet today — set the tone."}
+            {!preview && modeReady && sim && simScore !== null && (
+              <>
+                <span className="preview-pill">simulated</span>
+                {SCENES[simScene].caption} — {simPinged} of 7 pinged, average {simAvg.toFixed(1)}.
+                {simPinged === 7 ? ' you set this.' : ''}
+              </>
+            )}
+            {!preview && modeReady && !sim && scene === null && "nobody's pinged yet today — set the tone."}
             {!preview &&
+              modeReady &&
               !sim &&
               scene === 'gathering' &&
               `waiting on a few more before the water shows — pings stay anonymous. (${pingCount} of ${ANONYMITY_FLOOR} so far)`}
-            {!preview && !sim && scene !== null && scene !== 'gathering' && (
+            {!preview && modeReady && !sim && scene !== null && scene !== 'gathering' && (
               <>
                 {SCENES[scene].caption} — {pingCount} ping{pingCount === 1 ? '' : 's'} today
                 {typeof weather?.score === 'number' && `, average ${weather.score.toFixed(1)}`}
@@ -685,10 +842,12 @@ function Home({
         </nav>
         <div className="island-body">
       {view === 'ping' &&
+        modeReady &&
         (sim ? (
           <SimPingForm
             score={simScore}
             scene={simScene}
+            seatName={seat === YOU_SEAT ? null : mySeat.displayName}
             onPing={setSimScore}
             onReset={resetSim}
             onAgain={() => setSimScore(null)}
@@ -699,6 +858,28 @@ function Home({
       {view === 'you' && (
         <>
           <section className="card" aria-label="your avatar pose">
+            {sim && (
+              <>
+                <h3 className="sub">in this window you are</h3>
+                <div className="pose-row" role="radiogroup" aria-label="choose your seat">
+                  {simState.seats.map((s, i) => (
+                    <button
+                      key={s.id}
+                      role="radio"
+                      aria-checked={seat === i}
+                      className={seat === i ? 'pose selected' : 'pose'}
+                      onClick={() => setSeat(i)}
+                    >
+                      {i === YOU_SEAT ? (me?.displayName ?? 'you') : s.displayName}
+                    </button>
+                  ))}
+                </div>
+                <p className="muted small">
+                  open another window, pick a different seat, and you'll see each other move — the
+                  simulated team is shared by every window of this browser.
+                </p>
+              </>
+            )}
             <p className="muted">
               your pose is yours to pick — it's never inferred from anyone's mood.
             </p>
@@ -709,7 +890,7 @@ function Home({
                   role="radio"
                   aria-checked={myPose === p.pose}
                   className={myPose === p.pose ? 'pose selected' : 'pose'}
-                  disabled={!myMembershipId}
+                  disabled={!sim && !myMembershipId}
                   onClick={() => setPose(p.pose)}
                 >
                   {p.label}
@@ -724,7 +905,7 @@ function Home({
                   role="radio"
                   aria-checked={mySpot === sp.spot}
                   className={mySpot === sp.spot ? 'pose selected' : 'pose'}
-                  disabled={!myMembershipId}
+                  disabled={!sim && !myMembershipId}
                   title={sp.hint}
                   onClick={() => setSpot(sp.spot)}
                 >
@@ -734,19 +915,25 @@ function Home({
             </div>
             <p className="muted small">{SPOTS.find((sp) => sp.spot === mySpot)?.hint}</p>
             {poseError && <p className="error">{poseError}</p>}
-            <NameEditor current={me?.displayName ?? ''} disabled={!myMembershipId} onSave={saveName} />
+            {!sim && (
+              <NameEditor current={me?.displayName ?? ''} disabled={!myMembershipId} onSave={saveName} />
+            )}
           </section>
         </>
       )}
 
-      {view === 'team' && (
-        <TeamPanel
-          members={members}
-          myUserId={myUserId}
-          isLead={isLead}
-          pingCount={pingCount}
-        />
-      )}
+      {view === 'team' &&
+        modeReady &&
+        (sim ? (
+          <SimTeam seats={simState.seats} seat={seat} meName={me?.displayName ?? 'you'} />
+        ) : (
+          <TeamPanel
+            members={members}
+            myUserId={myUserId}
+            isLead={isLead}
+            pingCount={pingCount}
+          />
+        ))}
       {view === 'report' && isLead && <ReportPanel />}
       {view === 'dev' && isDev && <DevPanel preview={preview} onPreview={setPreview} />}
         </div>
@@ -819,6 +1006,39 @@ function NameEditor({
             : 'up to 14 characters; this is what floats under your avatar.'}
       </p>
     </form>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// team (simulated): the seats, not the live roster — the live team's names
+// and remove buttons would contradict the river being simulated.
+
+function SimTeam({ seats, seat, meName }: { seats: SimSeat[]; seat: number; meName: string }) {
+  const pinged = seats.filter((s) => s.score !== null).length
+  return (
+    <section className="card team" aria-label="simulated team">
+      <div className="card-head">
+        <h2>simulated team</h2>
+        <span className="muted">7 seats · this browser only</span>
+      </div>
+      <p className="participation">
+        <strong>{pinged}</strong> of 7 have pinged — moods stay hidden; only the river shows them.
+      </p>
+      <ul className="roster">
+        {seats.map((s, i) => (
+          <li key={s.id} className="roster-row">
+            <span className="roster-name">
+              <span className="dot" style={{ background: memberColor(s.id) }} aria-hidden="true" />
+              {i === YOU_SEAT ? meName : s.displayName}
+              {i === seat && <span className="you-tag">this window</span>}
+            </span>
+            <span className="roster-meta">
+              {poseLabel(s.pose)} · {SPOTS.find((x) => x.spot === s.spot)?.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -911,7 +1131,9 @@ function TeamPanel({
 // report (leads)
 
 function ReportPanel() {
-  const [latest, setLatest] = useState<Schema['Report']['type'] | null>(null)
+  // undefined = not fetched yet, null = fetched and none exists — the panel
+  // must not flash "no report yet" while the first fetch is in flight
+  const [latest, setLatest] = useState<Schema['Report']['type'] | null | undefined>(undefined)
   const [status, setStatus] = useState<'idle' | 'waiting' | 'timeout'>('idle')
 
   const loadLatest = useCallback(async () => {
@@ -963,7 +1185,10 @@ function ReportPanel() {
           )}
         </article>
       )}
-      {!latest && status === 'idle' && <p className="muted">no report yet — generate the first one.</p>}
+      {latest === undefined && <p className="muted">looking for the latest report…</p>}
+      {latest === null && status === 'idle' && (
+        <p className="muted">no report yet — generate the first one.</p>
+      )}
       {status === 'timeout' && (
         <p className="error">the report didn't arrive in time — give it a minute and try again.</p>
       )}
@@ -1096,12 +1321,15 @@ function DevPanel({
 function SimPingForm({
   score,
   scene,
+  seatName,
   onPing,
   onReset,
   onAgain,
 }: {
   score: number | null
   scene: SceneName
+  /** null when this window holds your own seat, otherwise the teammate it drives */
+  seatName: string | null
   onPing: (s: number) => void
   onReset: () => void
   onAgain: () => void
@@ -1111,8 +1339,11 @@ function SimPingForm({
     return (
       <section className="card ping" aria-label="simulated ping">
         <p className="pinged">
-          you pinged {score} — the river went <strong>{scene}</strong>. that's what one honest answer
-          does to a team's weather.
+          {seatName ? `${seatName} pinged ${score}` : `you pinged ${score}`} — the river went{' '}
+          <strong>{scene}</strong>.{' '}
+          {seatName
+            ? 'every window of this browser sees it.'
+            : "that's what one honest answer does to a team's weather."}
         </p>
         <div className="roster-actions">
           <button
@@ -1131,7 +1362,7 @@ function SimPingForm({
               onAgain()
             }}
           >
-            ping again with the same teammates
+            {seatName ? `ping again as ${seatName}` : 'ping again with the same teammates'}
           </button>
         </div>
       </section>

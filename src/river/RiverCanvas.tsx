@@ -318,7 +318,9 @@ export default function RiverCanvas({
       }
       // The stream runs under the panel/sheet, but people and landmarks
       // stay above it: uMax is how far downstream anything placeable may go.
-      const limitY = h - (bottomInset > 0 ? bottomInset + 28 : 44)
+      // 56px of tail room: an avatar's name tag hangs ~40px below its anchor,
+      // so the anchor limit has to clear the frame by more than the body alone.
+      const limitY = h - (bottomInset > 0 ? bottomInset + 28 : 56)
       let uMax = 1
       for (const sp of path) {
         if (sp.y > limitY) {
@@ -333,10 +335,17 @@ export default function RiverCanvas({
       // spot that would sit under it moves to the outer water beside it; only
       // when that's blocked too (or on a phone sheet) does it move upstream.
       const panelHalf = Math.min(540, w * 0.92) / 2 + 16
+      // Blocked means either off the bottom edge of the frame (any layout —
+      // an avatar bisected by the viewport is never acceptable) or under the
+      // open panel/sheet band.
+      // Same limit uMax was derived from, so the upstream fallback below always
+      // lands somewhere this test accepts.
+      const hardBottom = h - 56
       const blocked = (q: { x: number; y: number }) =>
-        bottomInset > 0 &&
-        q.y > limitY &&
-        (narrow || (q.x > w / 2 - panelHalf && q.x < w / 2 + panelHalf))
+        q.y > hardBottom ||
+        (bottomInset > 0 &&
+          q.y > limitY &&
+          (narrow || (q.x > w / 2 - panelHalf && q.x < w / 2 + panelHalf)))
       const place = (u: number, lane: number) => {
         let q = pointAt(u, lane)
         if (blocked(q) && !narrow) q = pointAt(u, (lane < 0 ? -1 : 1) * 0.95)
@@ -813,6 +822,40 @@ export default function RiverCanvas({
         const { x, y, sp } = place(u, lanes[k % lanes.length])
         placed.push({ m, x, y, s: sp.s, onLand: false, i: gi++ })
       })
+
+      // Two different spots can be clamped onto the same patch of water — the
+      // bottom-edge and panel limits both push people upstream — landing one
+      // name tag on top of another. Nudge overlapping pairs apart along x.
+      // People on a landmark (the rock, the tree's shade) stay put and act as
+      // obstacles; only the ones floating get moved. Rebuilt every frame from
+      // the same inputs, so it settles identically instead of drifting.
+      for (let pass = 0; pass < 3; pass++) {
+        let moved = false
+        for (let a = 0; a < placed.length; a++) {
+          for (let b = a + 1; b < placed.length; b++) {
+            const A = placed[a]
+            const B = placed[b]
+            if (Math.abs(A.y - B.y) > 26 * Math.max(A.s, B.s)) continue
+            const need = 30 * (A.s + B.s)
+            const dx = B.x - A.x
+            const gap = Math.abs(dx)
+            if (gap >= need) continue
+            const dir = dx === 0 ? 1 : Math.sign(dx)
+            const push = (need - gap) / 2 + 0.5
+            if (!A.onLand && !B.onLand) {
+              A.x -= dir * push
+              B.x += dir * push
+            } else if (!A.onLand) {
+              A.x -= dir * push * 2
+            } else if (!B.onLand) {
+              B.x += dir * push * 2
+            } else continue
+            moved = true
+          }
+        }
+        if (!moved) break
+      }
+      for (const p of placed) p.x = Math.max(20, Math.min(w - 20, p.x))
 
       placed.sort((a, b) => a.y - b.y)
       for (const pl of placed) {
