@@ -225,6 +225,17 @@ Costed each ask against the remaining hours and held the spec's lines
   pose change; signs out and back in; and a stranger walks the sign-up form.
   Any console or page error fails the run.
 
+### Milestone: production at parity (Fri ~1 AM)
+
+Build #9 deployed the scope round. Production now has the six accounts (five
+cast + dev), their groups, seeded memberships and pings, and every proof
+passing against it: realtime, report, reset. The long-running stray console
+400 turned out to be Cognito throttling an identity-pool credential exchange
+the browser never needed — dropping the identity pool from the client config
+removed the call path entirely; the click-through now runs with zero console
+errors. Remaining: record the video from docs/demo-script.md, write the
+article from this file, submit.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root
