@@ -551,6 +551,21 @@ input {
 
 /* ----------------------------------------------------------------- mobile */
 
+/* narrow screens: brand + actions on row one, tabs get their own row */
+@media (max-width: 40rem) {
+  .tabs {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+  }
+
+  .header-actions {
+    margin-left: auto;
+  }
+}
+
 @media (max-width: 30rem) {
   .moods {
     grid-template-columns: repeat(5, 1fr);
