@@ -483,6 +483,46 @@ each finding independently verified before it counted:
 - The scene title got a second tight text-shadow so a pale cloud drifting
   behind it can't swallow the word.
 
+### A sweep for two-window disagreements (Fri, during recording prep)
+
+After the panel fix I ran a fleet over the same question from three angles —
+render inputs, member ordering, and a live two-window drive — with every
+candidate handed to an adversarial verifier before it counted. Two survived,
+and the verifier corrected the first one's blast radius, which was the useful
+part.
+
+**The bob phase was dealt by draw order.** `bySpot` is a Map keyed by the order
+spots first appear in the member list, and a running `gi++` over its groups
+seeded each avatar's sine phase. So when one person changed spot, the group
+order changed and *everyone else* got a new phase — a ~9px vertical pop in
+storm, on avatars roughly 32px tall, while the rest of the scene glided. Demo
+beat 30–40s is literally "pick the eddy", so this was aimed straight at the
+recording.
+
+The claim arrived asserting it also desynced two windows permanently. It does
+not: members are sorted by `createdAt` before they reach the canvas, so both
+windows build the same order and pop identically at the same instant. Worth
+recording that the verifier *narrowed* a finding rather than confirming it —
+an unchallenged bug report would have sent me looking for a sync bug that
+wasn't there.
+
+The phase now comes from `hashId(m.id) % 997`, so it belongs to the person
+rather than to their position in the draw order and cannot be re-dealt by
+someone else's move. Proved by hooking `fillText` and reading the canvas
+transform to get each avatar's true drawn y: move one person to an empty spot
+and the uninvolved cast reads 0.29px → 0.29px and 0.39px → 0.39px, frame to
+frame. The two who do move are the mover (350px, relocating) and the teammate
+whose spot he left, un-fanning back to centre — both correct, and worth
+separating from the bug rather than lumping in as noise.
+
+**A previewing window is deaf to the subscription.** `preview` sits ahead of
+the live weather in `shownScene`, and the dev panel that sets it unmounts when
+the panel is collapsed — so a window left on a previewed scene ignores the one
+thing the whole demo is about, with no way back. Giving leads the dev tab an
+hour earlier had just widened who could do this. The badge in the caption is
+now the way out ("preview · this window only · back to live"), which means the
+escape hatch is on screen exactly when the control is gone.
+
 ### The demo lead can reset the river (Fri, during recording prep)
 
 Presenting meant keeping a third account signed in just to put the river back

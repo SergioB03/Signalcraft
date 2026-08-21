@@ -47,7 +47,7 @@ export const MEMBER_COLORS = [
 ]
 const HAIR_COLORS = ['#3b2a20', '#6b4a2e', '#b5803f', '#2b2b2b', '#8a6b5a', '#d9b38c']
 
-function hashId(id: string): number {
+export function hashId(id: string): number {
   let h = 7
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
   return h

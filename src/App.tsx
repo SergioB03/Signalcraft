@@ -799,7 +799,18 @@ function Home({
           <p className="scene-caption">
             {preview && (
               <>
-                <span className="preview-pill">preview · this window only</span>
+                {/* The dev panel that set this unmounts when the panel is
+                    collapsed, and a previewing window ignores the live
+                    subscription — the one thing the demo is about. So the
+                    badge itself is the way back to live, always on screen. */}
+                <button
+                  type="button"
+                  className="preview-pill preview-pill-clear"
+                  onClick={() => setPreview(null)}
+                  title="back to the live weather"
+                >
+                  preview · this window only · back to live
+                </button>
                 {SCENES[preview].caption}.
               </>
             )}

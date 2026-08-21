@@ -1,5 +1,15 @@
 import { useEffect, useRef } from 'react'
-import { SCENES, hexToRgb, lerp, lerpRgb, memberColor, memberHair, memberHat, rgbCss } from './scenes'
+import {
+  SCENES,
+  hashId,
+  hexToRgb,
+  lerp,
+  lerpRgb,
+  memberColor,
+  memberHair,
+  memberHat,
+  rgbCss,
+} from './scenes'
 import type { Hat, Rgb, RiverMember, SceneName, Spot } from './scenes'
 
 type Props = {
@@ -807,12 +817,17 @@ export default function RiverCanvas({
         }
       }
 
-      let gi = 0
+      // A person's animation phase belongs to the PERSON, not to their index in
+      // the draw order. `bySpot` is keyed by the order spots first appear, so
+      // anyone changing spot re-orders the groups — and a running counter would
+      // hand every other avatar a new phase, snapping people who never moved.
+      // The demo does exactly this ("pick the eddy"), so it has to be stable.
+      const seed = (m: RiverMember) => hashId(m.id) % 997
       for (const [spot, group] of bySpot) {
         if (spot === 'drift') continue
         group.forEach((m, k) => {
           const a = anchor(spot, k, group.length)
-          if (a) placed.push({ m, ...a, i: gi++ })
+          if (a) placed.push({ m, ...a, i: seed(m) })
         })
       }
       const drifters = bySpot.get('drift') ?? []
@@ -820,7 +835,7 @@ export default function RiverCanvas({
       drifters.forEach((m, k) => {
         const u = 0.14 + ((k + 0.5) / drifters.length) * 0.74
         const { x, y, sp } = place(u, lanes[k % lanes.length])
-        placed.push({ m, x, y, s: sp.s, onLand: false, i: gi++ })
+        placed.push({ m, x, y, s: sp.s, onLand: false, i: seed(m) })
       })
 
       // Two different spots can be clamped onto the same patch of water — the

@@ -451,6 +451,22 @@
   letter-spacing: 0.03em;
 }
 
+/* The scene label is pointer-events: none so it never eats clicks meant for
+   the river; this one badge opts back in, because it is the only way out of a
+   preview once the panel is collapsed. */
+.preview-pill-clear {
+  pointer-events: auto;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+}
+
+.preview-pill-clear:hover {
+  background: rgba(232, 200, 126, 0.4);
+}
+
 .dev-preview {
   display: flex;
   flex-direction: column;
