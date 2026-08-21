@@ -104,11 +104,15 @@ const schema = a
 
     // Test-environment control for the dev group: forget today's receipts so
     // demo accounts can ping again, or wipe / reseed the whole river.
+    // `lead` is here for the showcase: the demo lead needs to put the river
+    // back between walkthroughs without a second account. Group assignment is
+    // manual, so a visitor who signs up gets neither group and cannot reach
+    // this — the demo cast is the only audience it widens to.
     resetDemoDay: a
       .mutation()
       .arguments({ teamId: a.id().required(), scope: a.string() })
       .returns(a.json())
-      .authorization((allow) => [allow.group('dev')])
+      .authorization((allow) => [allow.groups(['dev', 'lead'])])
       .handler(a.handler.function(resetDemo)),
   })
   // Lambdas talk to this API with IAM auth so their writes are AppSync

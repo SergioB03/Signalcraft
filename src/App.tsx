@@ -543,7 +543,9 @@ function Home({
     'you',
     'team',
     ...(isLead ? (['report'] as View[]) : []),
-    ...(isDev ? (['dev'] as View[]) : []),
+    // Leads get the test-environment tab too, so the demo lead can reset the
+    // river mid-walkthrough instead of signing a third account in.
+    ...(isDev || isLead ? (['dev'] as View[]) : []),
   ]
   const [view, setView] = useHashView(views)
 
@@ -949,7 +951,7 @@ function Home({
           />
         ))}
       {view === 'report' && isLead && <ReportPanel />}
-      {view === 'dev' && isDev && <DevPanel preview={preview} onPreview={setPreview} />}
+      {view === 'dev' && (isDev || isLead) && <DevPanel preview={preview} onPreview={setPreview} />}
         </div>
       </aside>
       )}
@@ -1266,7 +1268,7 @@ function DevPanel({
     <section className="card dev" aria-label="test environment">
       <div className="card-head">
         <h2>test environment</h2>
-        <span className="muted">dev only · acts on the demo team</span>
+        <span className="muted">leads and dev · acts on the demo team</span>
       </div>
       <div className="dev-preview">
         <strong>preview the weather</strong>

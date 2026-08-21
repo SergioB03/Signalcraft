@@ -483,6 +483,27 @@ each finding independently verified before it counted:
 - The scene title got a second tight text-shadow so a pale cloud drifting
   behind it can't swallow the word.
 
+### The demo lead can reset the river (Fri, during recording prep)
+
+Presenting meant keeping a third account signed in just to put the river back
+between takes. `resetDemoDay` now authorizes `lead` alongside `dev`, and the
+test-environment tab shows for both.
+
+This widens a destructive control, so it's worth being precise about who it
+reaches: group assignment is manual — there is no self-service escalation —
+so a visitor who signs up lands in neither group. The only accounts it adds
+are the demo cast's lead. Verified both directions rather than assumed: ana
+reaches the controls, a plain member still has no tab at all.
+
+Worth noting the near miss. The root `tsconfig.json` only references
+`tsconfig.app.json` and `tsconfig.node.json`, so `tsc -b` never typechecks
+`amplify/` — a backend edit gets no local typecheck at all, and with the AWS
+session expired there was no sandbox to deploy it to either. A bad
+authorization rule would have surfaced as a failed pipeline, taking the
+frontend down with it. Checked `allow.groups(string[])` against the shipped
+`data-schema` type definitions and ran `tsc -p amplify/tsconfig.json` by hand
+before pushing. That reference belongs in the root tsconfig.
+
 ### The panel was moving the team (Fri, during recording prep)
 
 Caught while setting up the two-window shot: collapsing the glass panel
