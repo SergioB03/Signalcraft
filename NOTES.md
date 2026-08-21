@@ -185,6 +185,15 @@ validation); a hostile signed-up account could pre-create another user's
 receipt id or fake Membership rows. Real enforcement means a custom mutation
 doing both writes server-side — first item on the post-challenge list.
 
+### Milestone: everything proven in production (Fri ~12:30 AM)
+
+Build #7 deployed the review fixes; both proof scripts then passed against the
+production backend itself — realtime (ping → stream → Lambda → subscription in
+~1s) and the full report pipeline (button-as-a-row → Python Lambda → Bedrock
+Haiku 4.5 → report readable by the lead). Production is seeded past the
+anonymity floor and has demo accounts. Every Tier 1 and Tier 2 feature works
+on the public URL. Remaining: video, article, submission form.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root
