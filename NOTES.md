@@ -120,6 +120,29 @@ ever needs client-side ping reads.
   (membership-creation race absorbed by the conditional create; benign but worth
   a look before submission).
 
+### The Bedrock report — Python slice, and an account-verification ambush
+
+- **Blocker found early (spec §10 vindicated):** every Bedrock invoke returns
+  AccessDenied — not model access, but *new-AWS-account verification* ("normally
+  takes less than 2 hours"). Nothing to fix; only to wait. Found it with a
+  10-second CLI test *before* writing the Lambda, so the feature gets built now
+  and lights up when AWS finishes verifying. If this had been discovered through
+  the app tomorrow it would have looked like a mysterious Lambda bug.
+- **Architecture: the button is a database row.** Lead presses "generate" → the
+  client creates a ReportRequest → that table's stream triggers the Python 3.12
+  Lambda → it aggregates pings (counts, daily averages, deduped + shuffled
+  notes — never authors, which don't exist), calls Claude via Bedrock's Converse
+  API (boto3-native, zero pip dependencies), and writes the Report row straight
+  to DynamoDB. The lead's browser *polls* for it — a deliberate exception to our
+  realtime religion, because direct DynamoDB writes don't fire subscriptions and
+  hand-signing AppSync calls from Python wasn't worth it for a lead-only,
+  once-a-week surface. Tradeoff logged, demo unaffected.
+- **Model: Claude Opus 5** (`us.anthropic.claude-opus-5` inference profile) per
+  current guidance — at ~one 500-token report on demand, model cost is noise.
+- Seed script added (Tier 2 #12) — and it works through exactly the
+  client-orchestration gap we logged earlier (pings without receipts), which is
+  both convenient tonight and exhibit A for the article's honesty section.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root

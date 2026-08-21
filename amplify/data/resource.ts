@@ -75,6 +75,16 @@ const schema = a
         suggestedAction: a.string(),
       })
       .authorization((allow) => [allow.group('lead')]),
+
+    // A lead pressing "generate report", as a record: its table stream
+    // triggers the Python report Lambda (wired in backend.ts). The Lambda
+    // writes the Report row directly, and the lead's browser polls for it —
+    // no subscription needed on this path.
+    ReportRequest: a
+      .model({
+        teamId: a.id().required(),
+      })
+      .authorization((allow) => [allow.group('lead')]),
   })
   // The weather Lambda talks to this API with IAM auth so its WeatherState
   // writes are AppSync mutations — which is what makes subscriptions fire.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   confirmSignUp,
+  fetchAuthSession,
   fetchUserAttributes,
   getCurrentUser,
   signIn,
@@ -172,6 +173,18 @@ function River({ onSignOut }: { onSignOut: () => void }) {
   const [members, setMembers] = useState<MembershipRow[]>([])
   const [myUserId, setMyUserId] = useState<string | null>(null)
   const [myMembershipId, setMyMembershipId] = useState<string | null>(null)
+  const [isLead, setIsLead] = useState(false)
+
+  // Group membership rides inside the signed access token — no extra query.
+  useEffect(() => {
+    fetchAuthSession()
+      .then((session) => {
+        const groups =
+          (session.tokens?.accessToken.payload['cognito:groups'] as string[] | undefined) ?? []
+        setIsLead(groups.includes('lead'))
+      })
+      .catch(() => {})
+  }, [])
 
   // Make sure the demo team + my membership exist. Deterministic membership
   // id (`teamId#userId`) means StrictMode's double-run can't create dupes —
@@ -304,7 +317,72 @@ function River({ onSignOut }: { onSignOut: () => void }) {
       </section>
 
       <PingForm />
+
+      {isLead && <ReportPanel />}
     </main>
+  )
+}
+
+function ReportPanel() {
+  const [latest, setLatest] = useState<Schema['Report']['type'] | null>(null)
+  const [status, setStatus] = useState<'idle' | 'waiting' | 'timeout'>('idle')
+
+  const loadLatest = useCallback(async () => {
+    const { data } = await client.models.Report.list({
+      filter: { teamId: { eq: TEAM_ID } },
+    })
+    const newest =
+      [...data].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0] ?? null
+    setLatest(newest)
+    return newest
+  }, [])
+
+  useEffect(() => {
+    loadLatest()
+  }, [loadLatest])
+
+  const generate = async () => {
+    setStatus('waiting')
+    const before = latest?.createdAt ?? ''
+    await client.models.ReportRequest.create({ teamId: TEAM_ID })
+    // The Python Lambda writes the Report row straight to DynamoDB, so no
+    // subscription fires (they only fire on AppSync mutations) — we poll.
+    const deadline = Date.now() + 60_000
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 3000))
+      const fresh = await loadLatest()
+      if (fresh && (fresh.createdAt ?? '') > before) {
+        setStatus('idle')
+        return
+      }
+    }
+    setStatus('timeout')
+  }
+
+  return (
+    <section className="report" aria-label="current report">
+      <h2>current report — leads only</h2>
+      {latest && (
+        <article>
+          <p className="report-period">
+            {latest.periodStart} → {latest.periodEnd}
+          </p>
+          <p>{latest.body}</p>
+          {latest.suggestedAction && (
+            <p className="report-action">try this: {latest.suggestedAction}</p>
+          )}
+        </article>
+      )}
+      {!latest && status === 'idle' && <p>no report yet — generate the first one.</p>}
+      {status === 'timeout' && (
+        <p className="error">
+          the report didn't arrive in time — give it a minute and try again.
+        </p>
+      )}
+      <button onClick={generate} disabled={status === 'waiting'}>
+        {status === 'waiting' ? 'reading the water…' : 'generate current report'}
+      </button>
+    </section>
   )
 }
 

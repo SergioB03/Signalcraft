@@ -181,6 +181,40 @@ button.link {
   color: var(--on-accent);
 }
 
+.report {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  background: var(--stone);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 34rem;
+}
+
+.report article {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.report p {
+  margin: 0;
+}
+
+.report-period {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.report-action {
+  color: var(--sun);
+}
+
+.report button {
+  align-self: flex-start;
+}
+
 .error {
   color: var(--clay);
   margin: 0;
