@@ -42,6 +42,23 @@ dependencies.
   CLI installed via winget; credentials + Amplify Hosting connection are the first
   console tasks.
 
+### Bug: first Amplify build failed — lockfile out of sync with npm ci
+
+First CI build failed in ~60s: `npm ci` rejected `package-lock.json` ("Missing:
+@opentelemetry/core@2.0.0 from lock file"). Regenerating the lockfile from a clean
+slate (`rm package-lock.json node_modules; npm install`) did NOT fix it — `npm ci`
+then reported ~60 missing entries, all transitive deps of the AWS CDK toolchain.
+Root cause: a known npm bug where the lockfile omits *bundled dependencies'*
+subtrees, so `npm ci`'s strict sync check fails on a lockfile npm itself just wrote.
+Reproduced identically on Windows-local and Amazon-Linux-CI, ruling out an
+environment mismatch.
+
+Fix: `amplify.yml` at repo root overrides the build to use `npm install` instead of
+`npm ci`. Tradeoff accepted and logged: slightly weaker build reproducibility in
+exchange for an unblocked pipeline, per the "simpler version after 30 minutes" rule.
+Lesson: `npm install` resolves and may update the lockfile; `npm ci` installs exactly
+the lockfile or refuses — CI uses the strict one so builds can't drift.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root

@@ -1,0 +1,22 @@
+version: 1
+backend:
+  phases:
+    build:
+      commands:
+        # npm ci would be the right call in CI, but a known npm bug omits the
+        # CDK toolchain's bundled-dependency subtree from package-lock.json,
+        # so npm ci rejects even a freshly generated lockfile (see NOTES.md).
+        - npm install --cache .npm --prefer-offline
+        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
+frontend:
+  phases:
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .npm/**/*
