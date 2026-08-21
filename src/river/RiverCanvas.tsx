@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { SCENES, hexToRgb, lerp, lerpRgb, rgbCss } from './scenes'
+import { SCENES, hexToRgb, lerp, lerpRgb, memberColor, memberHair, rgbCss } from './scenes'
 import type { Rgb, RiverMember, SceneName, Spot } from './scenes'
 
 type Props = {
@@ -31,6 +31,8 @@ type Palette = {
   bank: Rgb
   foliage: Rgb
   hill: Rgb
+  earth: Rgb
+  flowers: number
   sun: number
   clouds: number
   rain: number
@@ -58,6 +60,8 @@ function paletteFor(scene: SceneName): Palette {
     bank: hexToRgb(s.bank),
     foliage: hexToRgb(s.foliage),
     hill: hexToRgb(s.hill),
+    earth: hexToRgb(s.earth),
+    flowers: s.flowers,
     sun: s.sun,
     clouds: s.clouds,
     rain: s.rain,
@@ -74,6 +78,8 @@ function mix(a: Palette, b: Palette, t: number): Palette {
     bank: lerpRgb(a.bank, b.bank, t),
     foliage: lerpRgb(a.foliage, b.foliage, t),
     hill: lerpRgb(a.hill, b.hill, t),
+    earth: lerpRgb(a.earth, b.earth, t),
+    flowers: lerp(a.flowers, b.flowers, t),
     sun: lerp(a.sun, b.sun, t),
     clouds: lerp(a.clouds, b.clouds, t),
     rain: lerp(a.rain, b.rain, t),
@@ -107,10 +113,19 @@ type Scenery = {
   trees: Array<{ side: -1 | 1; u: number; off: number; size: number; shade: number }>
   rocks: Array<{ lane: number; u: number; size: number }>
   streaks: Array<{ lane: number; phase: number; len: number }>
+  flowers: Array<{ u: number; v: number; c: number; size: number }>
 }
+
+const FLOWER_COLORS = ['#e8c87e', '#d98c6b', '#e6edf2', '#c9a0c0', '#e8c87e']
 
 function makeScenery(): Scenery {
   return {
+    flowers: Array.from({ length: 110 }, (_, i) => ({
+      u: rnd(i, 40),
+      v: rnd(i, 41),
+      c: Math.floor(rnd(i, 42) * FLOWER_COLORS.length),
+      size: 0.8 + rnd(i, 43) * 0.8,
+    })),
     grass: Array.from({ length: 280 }, (_, i) => ({
       u: rnd(i, 1),
       v: rnd(i, 2),
@@ -294,6 +309,12 @@ export default function RiverCanvas({ scene, members }: Props) {
         ctx.beginPath()
         ctx.arc(sx, sy, 11, 0, Math.PI * 2)
         ctx.fill()
+        // low warm light pooling at the horizon
+        const warm = ctx.createLinearGradient(0, horizon - 46, 0, horizon + 2)
+        warm.addColorStop(0, 'rgba(232, 200, 126, 0)')
+        warm.addColorStop(1, `rgba(232, 190, 126, ${0.32 * p.sun})`)
+        ctx.fillStyle = warm
+        ctx.fillRect(0, horizon - 46, w, 48)
       }
 
       const cloudCount = Math.round(p.clouds * 7)
@@ -356,6 +377,29 @@ export default function RiverCanvas({ scene, members }: Props) {
         ctx.stroke()
       }
 
+      // wildflowers — the first color to go when the weather turns
+      if (p.flowers > 0.02) {
+        for (const f of scenery.flowers) {
+          const x = f.u * w
+          const y = horizon + 10 + f.v * (h - horizon - 10)
+          const near = nearest(x, y)
+          if (near.d < near.sp.hw + 10) continue
+          const s = 0.6 + ((y - horizon) / (h - horizon)) * 0.9
+          const r = (1 + s) * f.size
+          ctx.fillStyle = FLOWER_COLORS[f.c]
+          ctx.globalAlpha = p.flowers * 0.9
+          ctx.beginPath()
+          ctx.arc(x + wind * 0.8, y - r * 1.8, r, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.globalAlpha = p.flowers * 0.5
+          ctx.fillStyle = '#ffffff'
+          ctx.beginPath()
+          ctx.arc(x + wind * 0.8 - r * 0.3, y - r * 2.1, r * 0.35, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.globalAlpha = 1
+      }
+
       // --- trees (incl. the old tree that casts the shade spot) ------------
       type Tree = { x: number; y: number; s: number; shade: number; big: boolean }
       const trees: Tree[] = []
@@ -390,7 +434,12 @@ export default function RiverCanvas({ scene, members }: Props) {
         ctx.fillStyle = rgbCss(lerpRgb(p.foliage, [0, 0, 0], 0.45))
         ctx.fillRect(tr.x - 1.6 * s, tr.y - 13 * s, 3.2 * s, 13 * s)
         const sway = wind * 2 * s
-        ctx.fillStyle = rgbCss(lerpRgb(p.foliage, p.bank, tr.shade * 0.4))
+        // some canopies run warm (a touch of sun in the green), fading with severity
+        const canopy =
+          tr.shade > 0.55
+            ? lerpRgb(p.foliage, hexToRgb('#e8c87e'), 0.22 * (1 - sev))
+            : lerpRgb(p.foliage, p.bank, tr.shade * 0.4)
+        ctx.fillStyle = rgbCss(canopy)
         for (const [dx, dy, rad] of [
           [0, -19, 9.5],
           [-7.5, -13.5, 7],
@@ -418,9 +467,12 @@ export default function RiverCanvas({ scene, members }: Props) {
         }
         ctx.closePath()
       }
-      // wet earth at the edge
-      bankPoly(5, 0.4, 0)
-      ctx.fillStyle = rgbCss(lerpRgb(p.bank, p.waterDeep, 0.45))
+      // the cut bank: warm earth, then a thin dry sandy lip above the water
+      bankPoly(7, 0.4, 0)
+      ctx.fillStyle = rgbCss(p.earth)
+      ctx.fill()
+      bankPoly(3, 0.4, 0)
+      ctx.fillStyle = rgbCss(lerpRgb(p.earth, FOAM, 0.25))
       ctx.fill()
       // the water, lit from upstream (far, hazy) to downstream (near, deep)
       bankPoly(0, 0.6 + sev * 3.5, 1)
@@ -514,6 +566,13 @@ export default function RiverCanvas({ scene, members }: Props) {
         ctx.beginPath()
         ctx.ellipse(-size * 0.3, -size * 0.25, size * 0.35, size * 0.15, 0, 0, Math.PI * 2)
         ctx.fill()
+        // a mossy cap in fair weather
+        if (sev < 0.5) {
+          ctx.fillStyle = rgbCss(lerpRgb(p.foliage, hexToRgb('#8fae7a'), 0.5), (0.5 - sev) * 1.5)
+          ctx.beginPath()
+          ctx.ellipse(size * 0.05, -size * 0.32, size * 0.6, size * 0.2, 0, 0, Math.PI * 2)
+          ctx.fill()
+        }
         if (foamAlpha > 0.01) {
           const wobble = Math.sin(t * 0.008 + u * 9) * 0.8
           ctx.fillStyle = rgbCss(FOAM, foamAlpha * 0.45)
@@ -621,7 +680,7 @@ export default function RiverCanvas({ scene, members }: Props) {
             return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
           }
           case 'rapids': {
-            const { x, y, sp } = pointAt(0.47, -0.15)
+            const { x, y, sp } = pointAt(0.5, 0.35)
             return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
           }
           case 'rock': {
@@ -681,7 +740,7 @@ export default function RiverCanvas({ scene, members }: Props) {
         // On a phone, seven name tags can't fit — keep yours (unless it would
         // land in the caption band); the team tab names everyone.
         const nameFits = !narrow || (pl.m.isMe && pl.y + 14 * pl.s + 10 < h - 100)
-        drawAvatar(ctx, pl.m, pl.x, pl.y + bob, t, pl.i, pl.s, nameFits)
+        drawAvatar(ctx, pl.m, pl.x, pl.y + bob, t, pl.i, pl.s * 1.15, pl.onLand, nameFits)
       }
     }
 
@@ -764,6 +823,12 @@ export default function RiverCanvas({ scene, members }: Props) {
 }
 
 // --- avatars ---------------------------------------------------------------
+// Each person: a personal color (shirt, gear), hair, a face, and a prop for
+// the pose. Drawn in a ~24px unit space and scaled by distance.
+
+const SKIN = '#f0d6ba'
+const WOOD = '#8a6642'
+const WOOD_DARK = '#6e4f33'
 
 function drawAvatar(
   ctx: CanvasRenderingContext2D,
@@ -773,52 +838,117 @@ function drawAvatar(
   t: number,
   i: number,
   s: number,
+  onLand: boolean,
   showName = true,
 ) {
+  const c = memberColor(m.id)
+  const hair = memberHair(m.id)
   ctx.save()
   ctx.translate(x, y)
   ctx.save()
   ctx.scale(s, s)
 
+  // a soft reflection under anyone on the water
+  if (!onLand && m.pose !== 'underwater') {
+    ctx.fillStyle = 'rgba(10, 14, 18, 0.18)'
+    ctx.beginPath()
+    ctx.ellipse(0, 4, 11, 3, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
   switch (m.pose) {
     case 'underwater': {
-      ctx.globalAlpha = 0.55
-      head(ctx, 0, 9)
-      ctx.globalAlpha = 0.8
+      ctx.globalAlpha = 0.62
+      head(ctx, 0, 7, hair)
+      // mask
       ctx.fillStyle = FOAM_CSS
+      ctx.fillRect(-3.6, 5.6, 7.2, 3)
+      ctx.fillStyle = '#6fb1c9'
+      ctx.fillRect(-3, 6.1, 6, 2)
+      ctx.globalAlpha = 1
+      // snorkel in their color, poking above the surface
+      ctx.strokeStyle = c
+      ctx.lineWidth = 1.8
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(4, 6)
+      ctx.lineTo(5.5, 0)
+      ctx.lineTo(6.5, -8)
+      ctx.stroke()
+      ctx.fillStyle = c
+      ctx.beginPath()
+      ctx.arc(6.5, -8.5, 1.4, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = 'rgba(230, 237, 242, 0.8)'
       for (let b = 0; b < 3; b++) {
-        const by = 4 - ((t * 0.04 + b * 14 + i * 5) % 26)
+        const by = 2 - ((t * 0.04 + b * 14 + i * 5) % 26)
         ctx.beginPath()
-        ctx.arc(4 + b * 3, by, 1.6 - b * 0.3, 0, Math.PI * 2)
+        ctx.arc(-4 + b * 2.5, by, 1.5 - b * 0.3, 0, Math.PI * 2)
         ctx.fill()
       }
       break
     }
     case 'raft': {
-      ctx.fillStyle = '#8a6642'
+      ctx.fillStyle = WOOD
       ctx.beginPath()
-      ctx.roundRect(-11, -2, 22, 5, 2)
+      ctx.roundRect(-13, -2, 26, 5, 1.5)
       ctx.fill()
-      head(ctx, 0, -8)
-      arm(ctx, -4, -6, -9, -1)
-      arm(ctx, 4, -6, 9, -1)
+      ctx.strokeStyle = WOOD_DARK
+      ctx.lineWidth = 0.8
+      for (const lx of [-7, -1, 5]) {
+        ctx.beginPath()
+        ctx.moveTo(lx, -2)
+        ctx.lineTo(lx, 3)
+        ctx.stroke()
+      }
+      // a little flag in their color
+      ctx.strokeStyle = WOOD_DARK
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(11, -2)
+      ctx.lineTo(11, -15)
+      ctx.stroke()
+      ctx.fillStyle = c
+      ctx.beginPath()
+      ctx.moveTo(11, -15)
+      ctx.lineTo(17.5, -12.5)
+      ctx.lineTo(11, -10)
+      ctx.closePath()
+      ctx.fill()
+      torso(ctx, c, 0, -6)
+      head(ctx, 0, -14, hair)
+      arm(ctx, -5, -8, -8, -2)
+      arm(ctx, 5, -8, 8, -2)
       break
     }
     case 'struck': {
-      head(ctx, 0, -8, '#6a6f75')
+      torso(ctx, c, 0, -3)
+      head(ctx, 0, -11, hair)
+      // hair standing on end
+      ctx.strokeStyle = hair
+      ctx.lineWidth = 1.2
+      ctx.lineCap = 'round'
+      for (let k = -2; k <= 2; k++) {
+        ctx.beginPath()
+        ctx.moveTo(k * 1.8, -15)
+        ctx.lineTo(k * 3.4, -21)
+        ctx.stroke()
+      }
+      arm(ctx, -5, -5, -10, -10)
+      arm(ctx, 5, -5, 10, -10)
       if ((t + i * 700) % 3400 < 220) {
         ctx.strokeStyle = SUN_CSS
         ctx.lineWidth = 2
         ctx.beginPath()
-        ctx.moveTo(2, -34)
-        ctx.lineTo(-3, -22)
-        ctx.lineTo(3, -18)
-        ctx.lineTo(-1, -11)
+        ctx.moveTo(2, -36)
+        ctx.lineTo(-3, -26)
+        ctx.lineTo(3, -23)
+        ctx.lineTo(-1, -17)
         ctx.stroke()
       }
       ctx.fillStyle = 'rgba(160, 165, 170, 0.5)'
       for (let k = 0; k < 2; k++) {
-        const sy = -16 - ((t * 0.02 + k * 9 + i * 3) % 14)
+        const sy = -19 - ((t * 0.02 + k * 9 + i * 3) % 14)
         ctx.beginPath()
         ctx.arc(k * 4 - 2, sy, 2.2, 0, Math.PI * 2)
         ctx.fill()
@@ -826,53 +956,128 @@ function drawAvatar(
       break
     }
     case 'coconut': {
-      ctx.strokeStyle = SUN_CSS
-      ctx.lineWidth = 2
+      // lounge chair: legs, seat, slanted back, stripes
+      ctx.strokeStyle = WOOD_DARK
+      ctx.lineWidth = 1.2
+      for (const lx of [-10, 6]) {
+        ctx.beginPath()
+        ctx.moveTo(lx, 2)
+        ctx.lineTo(lx, 7)
+        ctx.stroke()
+      }
+      ctx.fillStyle = c
       ctx.beginPath()
-      ctx.moveTo(-12, 2)
-      ctx.lineTo(-2, 2)
-      ctx.lineTo(8, -8)
+      ctx.roundRect(-13, 0, 22, 4, 1.5)
+      ctx.fill()
+      ctx.strokeStyle = c
+      ctx.lineWidth = 4
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(8, 1)
+      ctx.lineTo(13, -11)
       ctx.stroke()
-      head(ctx, 8, -13)
-      ctx.fillStyle = SUN_CSS
-      ctx.fillRect(-14, -8, 4, 6)
-      ctx.strokeStyle = FOAM_CSS
+      ctx.strokeStyle = 'rgba(230, 237, 242, 0.55)'
       ctx.lineWidth = 1
+      for (const sx of [-10, -6, -2, 2]) {
+        ctx.beginPath()
+        ctx.moveTo(sx, 0.5)
+        ctx.lineTo(sx, 3.5)
+        ctx.stroke()
+      }
+      // reclined body, lighter shirt so it reads against the chair
+      ctx.fillStyle = lighten(c)
       ctx.beginPath()
-      ctx.moveTo(-12, -8)
-      ctx.lineTo(-10, -13)
+      ctx.roundRect(-5, -6, 13, 7, 3)
+      ctx.fill()
+      arm(ctx, -4, -1, -11, 1)
+      head(ctx, 9, -11, hair)
+      // the coconut, with a straw and a tiny umbrella
+      ctx.fillStyle = WOOD_DARK
+      ctx.beginPath()
+      ctx.arc(-14, -5, 3.2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = FOAM_CSS
+      ctx.lineWidth = 0.9
+      ctx.beginPath()
+      ctx.moveTo(-13, -7)
+      ctx.lineTo(-11.5, -12)
       ctx.stroke()
+      ctx.fillStyle = SUN_CSS
+      ctx.beginPath()
+      ctx.moveTo(-16, -11)
+      ctx.lineTo(-11.5, -15)
+      ctx.lineTo(-7, -11)
+      ctx.closePath()
+      ctx.fill()
       break
     }
     case 'waving': {
-      head(ctx, 0, -8)
-      arm(ctx, -4, -6, -9, -2)
+      torso(ctx, c, 0, -3)
+      head(ctx, 0, -11, hair)
+      arm(ctx, -5, -5, -9, -1)
       const wave = Math.sin(t * 0.009 + i) * 3
-      arm(ctx, 4, -7, 8, -16 + wave)
+      arm(ctx, 5, -6, 8, -17 + wave)
+      ctx.fillStyle = SKIN
+      ctx.beginPath()
+      ctx.arc(8.3, -18.5 + wave, 1.7, 0, Math.PI * 2)
+      ctx.fill()
       break
     }
     default: {
-      head(ctx, 0, -8)
-      arm(ctx, -4, -5, -10, -3)
-      arm(ctx, 4, -5, 10, -3)
+      // floating in an inner tube
+      torso(ctx, c, 0, -4)
+      ctx.strokeStyle = c
+      ctx.lineWidth = 4.2
+      ctx.beginPath()
+      ctx.ellipse(0, 0, 10.5, 5, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'
+      ctx.lineWidth = 1.3
+      ctx.beginPath()
+      ctx.ellipse(0, 0, 10.5, 5, 0, Math.PI * 1.1, Math.PI * 1.6)
+      ctx.stroke()
+      head(ctx, 0, -12, hair)
+      arm(ctx, -4, -6, -9, -1)
+      arm(ctx, 4, -6, 9, -1)
     }
   }
   ctx.restore()
 
   if (showName) {
     ctx.globalAlpha = 1
-    ctx.font = '10.5px system-ui, sans-serif'
+    ctx.font = `${m.isMe ? '600 ' : ''}10.5px system-ui, sans-serif`
     ctx.textAlign = 'center'
-    ctx.fillStyle = m.isMe ? SUN_CSS : 'rgba(230, 237, 242, 0.85)'
+    ctx.fillStyle = m.isMe ? SUN_CSS : c
     ctx.fillText(m.displayName.slice(0, 14), 0, 14 * s + 10)
   }
   ctx.restore()
 }
 
-function head(ctx: CanvasRenderingContext2D, x: number, y: number, color = FOAM_CSS) {
+function lighten(hex: string): string {
+  return rgbCss(lerpRgb(hexToRgb(hex), FOAM, 0.4))
+}
+
+function torso(ctx: CanvasRenderingContext2D, color: string, x: number, y: number) {
   ctx.fillStyle = color
   ctx.beginPath()
+  ctx.roundRect(x - 5, y - 4, 10, 9, 3)
+  ctx.fill()
+}
+
+function head(ctx: CanvasRenderingContext2D, x: number, y: number, hair: string) {
+  ctx.fillStyle = SKIN
+  ctx.beginPath()
   ctx.arc(x, y, 5, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = hair
+  ctx.beginPath()
+  ctx.arc(x, y - 0.4, 5.2, Math.PI * 1.02, Math.PI * 1.98)
+  ctx.closePath()
+  ctx.fill()
+  ctx.fillStyle = '#2b2f36'
+  ctx.beginPath()
+  ctx.arc(x - 1.8, y + 0.6, 0.7, 0, Math.PI * 2)
+  ctx.arc(x + 1.8, y + 0.6, 0.7, 0, Math.PI * 2)
   ctx.fill()
 }
 
@@ -883,8 +1088,8 @@ function arm(
   x2: number,
   y2: number,
 ) {
-  ctx.strokeStyle = FOAM_CSS
-  ctx.lineWidth = 2
+  ctx.strokeStyle = SKIN
+  ctx.lineWidth = 2.2
   ctx.lineCap = 'round'
   ctx.beginPath()
   ctx.moveTo(x1, y1)
