@@ -483,6 +483,35 @@ each finding independently verified before it counted:
 - The scene title got a second tight text-shadow so a pale cloud drifting
   behind it can't swallow the word.
 
+### The panel was moving the team (Fri, during recording prep)
+
+Caught while setting up the two-window shot: collapsing the glass panel
+rearranged the river. `bottomInset` went to `0` on collapse, and it feeds both
+the downstream placement limit and the under-the-panel relocation test, so
+every avatar re-placed. The demo puts one window with the panel **open** (you
+have to see the stones to ping) beside one **collapsed** (so the landscape
+fills the frame) — which meant the two windows drew the same team in different
+places, on the one screen where the whole claim is "you are both watching the
+same river".
+
+Placement is now a function of the viewport alone. Desktop reserves the panel
+band whether the panel is open or not, so collapsing only uncovers more water
+and nobody moves. A phone can only ever show one window, and its sheet is half
+the screen, so it stays responsive there. The river's *path* never depended on
+the panel — only placement did — so this was a two-line change once the cause
+was clear.
+
+The general rule, which is worth stating because it is easy to violate again:
+**local UI state must never reach shared-scene geometry.** Anything a single
+window can toggle — a panel, a tab, a preview override — has to leave the team
+exactly where it was.
+
+Proved rather than eyeballed: `.sync.mjs` signs in, samples the canvas above
+the panel band with `getImageData`, collapses the panel, samples again, and
+fails if more than 0.5% of the band changed. Water is frozen with Playwright's
+`reducedMotion: 'reduce'` so only placement can move the pixels. It reports
+0.006% at 1280x720 and 0.005% at 1440x900 — antialiasing, nothing else.
+
 The first cut of the overlap-nudge spaced people by body width and production
 promptly disproved it: name tags are drawn at a fixed 10.5px regardless of
 depth, so "sergiobanuelos" ran straight through "ana" while both bodies were

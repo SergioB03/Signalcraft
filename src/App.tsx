@@ -727,6 +727,20 @@ function Home({
 
   const pingCount = weather?.pingCount ?? 0
 
+  // Where people stand must not depend on per-window UI state. Two windows on
+  // the same team — one with the panel open to ping, one collapsed to show the
+  // river — have to agree about where everyone is, or "you're both watching the
+  // same river" is a claim the demo disproves in ten seconds. Desktop reserves
+  // the panel band whether it's open or not, so collapsing only uncovers more
+  // water and nobody moves. A phone can only ever show one window, so there's
+  // nothing to disagree with, and its sheet is half the screen — it stays
+  // responsive there.
+  const riverBottomInset = viewport.narrow
+    ? collapsed
+      ? 0
+      : Math.round(viewport.height * 0.54)
+    : Math.round(viewport.height * 0.44)
+
   return (
     <div className="app-viewport">
       <div className="full-bleed-canvas">
@@ -734,7 +748,7 @@ function Home({
           scene={shownScene}
           members={riverMembers}
           fill
-          bottomInset={collapsed ? 0 : Math.round(viewport.height * (viewport.narrow ? 0.54 : 0.44))}
+          bottomInset={riverBottomInset}
         />
       </div>
       <header className="viewport-header">
