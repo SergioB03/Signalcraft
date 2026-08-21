@@ -5,6 +5,12 @@ import type { Rgb, RiverMember, SceneName, Spot } from './scenes'
 type Props = {
   scene: SceneName | null
   members: RiverMember[]
+  /** Fill the wrapper's height instead of a fixed aspect (full-bleed layouts). */
+  fill?: boolean
+  /** Keep the stream's downstream end clear of a panel on the right (px). */
+  rightInset?: number
+  /** Keep the stream's downstream end clear of a sheet at the bottom (px). */
+  bottomInset?: number
 }
 
 /**
@@ -160,13 +166,21 @@ function makeScenery(): Scenery {
   }
 }
 
-export default function RiverCanvas({ scene, members }: Props) {
+export default function RiverCanvas({
+  scene,
+  members,
+  fill = false,
+  rightInset = 0,
+  bottomInset = 0,
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlayRef = useRef<HTMLCanvasElement>(null)
 
   const membersRef = useRef<RiverMember[]>(members)
   membersRef.current = members
+  const layoutRef = useRef({ fill, rightInset, bottomInset })
+  layoutRef.current = { fill, rightInset, bottomInset }
   const sceneryRef = useRef<Scenery | null>(null)
   if (!sceneryRef.current) sceneryRef.current = makeScenery()
 
@@ -213,9 +227,11 @@ export default function RiverCanvas({ scene, members }: Props) {
     const size = () => {
       dpr = currentDpr()
       const w = wrap.clientWidth
-      // Phones get a taller frame so the diagonal has room to descend.
-      const h =
-        w < 600
+      // Phones get a taller frame so the diagonal has room to descend;
+      // full-bleed layouts take whatever height the wrapper has.
+      const h = layoutRef.current.fill
+        ? Math.max(200, wrap.clientHeight)
+        : w < 600
           ? Math.min(400, Math.max(300, Math.round(w * 0.85)))
           : Math.min(460, Math.max(260, Math.round(w * 0.5)))
       for (const c of [canvas, overlay]) {
@@ -241,16 +257,21 @@ export default function RiverCanvas({ scene, members }: Props) {
       // --- the river path -------------------------------------------------
       const N = 80
       const path: Sample[] = []
+      // Where the stream ends: off the right edge normally; short of a side
+      // panel or bottom sheet when the layout has one.
+      const { rightInset, bottomInset } = layoutRef.current
+      const xEnd = rightInset > 0 ? w - rightInset + 24 : 1.06 * w
+      const bottomMargin = bottomInset > 0 ? bottomInset + 12 : h * (narrow ? 0.3 : 0.16)
       for (let i = 0; i <= N; i++) {
         const u = i / N
         path.push({
           u,
-          x: lerp(-0.06 * w, 1.06 * w, u),
+          x: lerp(-0.06 * w, xEnd, u),
           // narrow frames end the stream higher, clear of the scene caption
           y:
             horizon +
             h * 0.07 +
-            (h - horizon - h * (narrow ? 0.3 : 0.16)) * u ** 1.08 +
+            Math.max(h * 0.25, h - horizon - bottomMargin) * u ** 1.08 +
             Math.sin(u * 6.5 + 1.2) * h * 0.035,
           tx: 0,
           ty: 0,
@@ -680,7 +701,7 @@ export default function RiverCanvas({ scene, members }: Props) {
             return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
           }
           case 'rapids': {
-            const { x, y, sp } = pointAt(0.5, 0.35)
+            const { x, y, sp } = pointAt(0.55, 0.5)
             return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
           }
           case 'rock': {

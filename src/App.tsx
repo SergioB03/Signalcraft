@@ -21,6 +21,7 @@ import BlurText from './ui/BlurText'
 import LoginHorizon from './ui/LoginHorizon'
 import SceneTitle from './ui/SceneTitle'
 import './App.css'
+import './hud.css'
 
 const client = generateClient<Schema>()
 
@@ -102,6 +103,19 @@ function useGroups() {
       .catch(() => {})
   }, [])
   return { isLead: groups.includes('lead'), isDev: groups.includes('dev') }
+}
+
+// Viewport facts the full-bleed layout needs: phone-width (the island becomes
+// a bottom sheet) and height (how much of the stream the sheet covers).
+function useViewport() {
+  const read = () => ({ narrow: window.innerWidth < 600, height: window.innerHeight })
+  const [vp, setVp] = useState(read)
+  useEffect(() => {
+    const onResize = () => setVp(read())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return vp
 }
 
 // Local calendar day, not UTC — the ping day should roll at the user's
@@ -391,6 +405,9 @@ function Home({
   // Dev-only local override of the scene (never written anywhere): lets the
   // presenter show "storm" on cue, and lets us tune every scene by eye.
   const [preview, setPreview] = useState<SceneName | null>(null)
+  // The glass island over the river can be tucked away into a bubble.
+  const [collapsed, setCollapsed] = useState(false)
+  const viewport = useViewport()
 
   // Make sure the demo team + my membership exist. Deterministic membership
   // id (`teamId#userId`) means StrictMode's double-run can't create dupes —
@@ -503,8 +520,17 @@ function Home({
   const pingCount = weather?.pingCount ?? 0
 
   return (
-    <main className="shell">
-      <header className="topbar">
+    <div className="app-viewport">
+      <div className="full-bleed-canvas">
+        <RiverCanvas
+          scene={shownScene}
+          members={riverMembers}
+          fill
+          rightInset={!viewport.narrow && !collapsed ? 384 : 0}
+          bottomInset={viewport.narrow && !collapsed ? Math.round(viewport.height * 0.54) : 0}
+        />
+      </div>
+      <header className="viewport-header">
         <span className="brand">undercurrent</span>
         <nav className="tabs" aria-label="sections">
           {views.map((v) => (
@@ -512,7 +538,10 @@ function Home({
               key={v}
               className={view === v ? 'tab active' : 'tab'}
               aria-current={view === v ? 'page' : undefined}
-              onClick={() => setView(v)}
+              onClick={() => {
+                setView(v)
+                setCollapsed(false)
+              }}
             >
               {v}
             </button>
@@ -532,9 +561,7 @@ function Home({
         </span>
       </header>
 
-      <section className="water" aria-label={`team weather: ${shownScene ?? 'no pings yet'}`}>
-        <RiverCanvas scene={shownScene} members={riverMembers} />
-        <div className="scene-label">
+      <div className="scene-label hud-label" aria-label={`team weather: ${shownScene ?? 'no pings yet'}`}>
           <SceneTitle className="scene-name" text={shownScene ?? 'still water'} />
           <p className="scene-caption">
             {preview && (
@@ -554,13 +581,24 @@ function Home({
               </>
             )}
           </p>
-        </div>
-      </section>
+      </div>
 
+      {collapsed ? (
+        <button className="hud-bubble" onClick={() => setCollapsed(false)} aria-label="open the panel">
+          ≈
+        </button>
+      ) : (
+      <aside className="riverbank-island dock-right" aria-label={`${view} panel`}>
+        <div className="island-head">
+          <span>{view === 'river' ? 'you, on the river' : view}</span>
+          <button className="link subtle" onClick={() => setCollapsed(true)}>
+            hide
+          </button>
+        </div>
+        <div className="island-body">
       {view === 'river' && (
-        <div className="panel-grid">
+        <>
           <section className="card" aria-label="your avatar pose">
-            <h2>you, on the river</h2>
             <p className="muted">
               your pose is yours to pick — it's never inferred from anyone's mood.
             </p>
@@ -599,7 +637,7 @@ function Home({
             <NameEditor current={me?.displayName ?? ''} disabled={!myMembershipId} onSave={saveName} />
           </section>
           <PingForm />
-        </div>
+        </>
       )}
 
       {view === 'team' && (
@@ -612,7 +650,10 @@ function Home({
       )}
       {view === 'report' && isLead && <ReportPanel />}
       {view === 'dev' && isDev && <DevPanel preview={preview} onPreview={setPreview} />}
-    </main>
+        </div>
+      </aside>
+      )}
+    </div>
   )
 }
 
@@ -1054,20 +1095,26 @@ function PingForm() {
     <section className="card ping" aria-label="today's ping">
       <h2>drop today's ping</h2>
       <p className="muted">one tap, anonymous, once a day.</p>
-      <div className="moods" role="radiogroup" aria-label="today's mood">
+      <div className="mood-selector-container" role="radiogroup" aria-label="today's mood">
         {MOODS.map((m) => (
           <button
             key={m.score}
             role="radio"
             aria-checked={selected === m.score}
-            className={selected === m.score ? 'mood selected' : 'mood'}
+            aria-label={`${m.score} — ${m.label}`}
+            data-mood={m.score}
+            className={selected === m.score ? 'mood-stone selected' : 'mood-stone'}
             onClick={() => setSelected(m.score)}
           >
-            <span className="mood-num">{m.score}</span>
-            {m.label}
+            {m.score}
           </button>
         ))}
       </div>
+      <p className="mood-caption" aria-live="polite">
+        {selected === null
+          ? 'pick a stone — 1 is sinking, 5 is glassy.'
+          : `${selected} — ${MOODS.find((m) => m.score === selected)?.label}`}
+      </p>
       <input
         placeholder="optional note, 140 characters"
         maxLength={140}

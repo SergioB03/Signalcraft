@@ -1,0 +1,302 @@
+/* ==========================================================================
+   UNDERCURRENT IMMERSIVE HUD
+   Adapted from an external design pass: full-bleed river, a glass island
+   floating over it, riverstone mood selectors. Adjustments from the source:
+   fixed-position viewport (no scrollbar math), islands scroll internally,
+   centering without transforms (reduced-motion safe), header text stays
+   foam on its dark gradient in both themes.
+   ========================================================================== */
+
+/* 1. Full-bleed viewport */
+.app-viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--silt);
+}
+
+.full-bleed-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.full-bleed-canvas .river-wrap,
+.full-bleed-canvas canvas {
+  height: 100%;
+}
+
+/* header floats over the sky */
+.viewport-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  background: linear-gradient(to bottom, rgba(27, 32, 39, 0.78), rgba(27, 32, 39, 0));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 14px 24px 28px;
+  pointer-events: none;
+  margin: 0;
+}
+
+.viewport-header * {
+  pointer-events: auto;
+}
+
+.viewport-header .brand,
+.viewport-header .tab,
+.viewport-header .link {
+  color: #e6edf2;
+}
+
+.viewport-header .tab {
+  opacity: 0.75;
+}
+
+.viewport-header .tab:hover,
+.viewport-header .tab.active {
+  opacity: 1;
+  background: rgba(230, 237, 242, 0.16);
+  border-color: rgba(230, 237, 242, 0.25);
+}
+
+.viewport-header .header-actions {
+  margin-left: 0;
+}
+
+/* the scene name, bottom-left, over the bank */
+.hud-label {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  right: auto;
+  max-width: min(48vw, 560px);
+  z-index: 5;
+}
+
+/* 2. Glass island */
+.riverbank-island {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: rgba(46, 57, 68, 0.85);
+  border: 1px solid rgba(230, 237, 242, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--foam);
+  overflow: hidden;
+}
+
+/* --foam is the *text* role in both themes (dark text in light mode);
+   the source used --silt here, which is the pale page ground in light mode. */
+:root[data-theme='light'] .riverbank-island {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(27, 32, 39, 0.1);
+  color: var(--foam);
+  box-shadow: 0 8px 32px rgba(27, 32, 39, 0.12);
+}
+
+.dock-right {
+  top: 76px;
+  right: 24px;
+  bottom: 24px;
+  width: 360px;
+}
+
+.island-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.9rem 1.1rem 0.4rem;
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  flex: none;
+}
+
+.island-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.2rem 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* our cards flatten inside the glass */
+.island-body .card {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+}
+
+.island-body .card + .card {
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.island-body input {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+}
+
+/* minimized bubble */
+.hud-bubble {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--stone);
+  color: var(--foam);
+  border: 2px solid var(--reed);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.4rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.hud-bubble:hover {
+  transform: scale(1.05);
+  background: var(--reed);
+}
+
+/* 3. Riverstone mood selectors */
+.mood-selector-container {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin: 0.25rem 0 0;
+}
+
+.mood-stone {
+  width: 54px;
+  height: 54px;
+  border: none;
+  background: var(--silt);
+  color: var(--foam);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow:
+    inset 0 -4px 8px rgba(0, 0, 0, 0.25),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+:root[data-theme='light'] .mood-stone {
+  background: #cfd8de;
+  color: var(--foam);
+}
+
+/* irregular radii — river stones, no two alike */
+.mood-stone:nth-child(1) { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; }
+.mood-stone:nth-child(2) { border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%; }
+.mood-stone:nth-child(3) { border-radius: 40% 60% 40% 60% / 50% 50% 50% 50%; }
+.mood-stone:nth-child(4) { border-radius: 55% 45% 70% 30% / 30% 60% 40% 70%; }
+.mood-stone:nth-child(5) { border-radius: 48% 52% 35% 65% / 55% 35% 65% 45%; }
+
+.mood-stone:hover {
+  transform: translateY(-3px) scale(1.06);
+  box-shadow:
+    inset 0 -2px 4px rgba(0, 0, 0, 0.1),
+    0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* a wet, glowing stone once chosen */
+.mood-stone.selected {
+  background: var(--reed);
+  color: #e6edf2;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 14px var(--reed);
+  transform: translateY(1px);
+}
+
+.mood-stone.selected[data-mood='1'] {
+  background: var(--clay);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 14px var(--clay);
+}
+
+.mood-caption {
+  margin: 0.35rem 0 0;
+  min-height: 1.4em;
+  font-size: 0.92rem;
+  opacity: 0.8;
+}
+
+/* 4. Phones: the island becomes a bottom sheet, the label moves up top */
+@media (max-width: 600px) {
+  .viewport-header {
+    padding: 10px 14px 22px;
+    flex-wrap: wrap;
+  }
+
+  .viewport-header .tabs {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .hud-label {
+    left: 14px;
+    right: 14px;
+    top: 110px;
+    bottom: auto;
+    max-width: none;
+  }
+
+  .riverbank-island.dock-right {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 54vh;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .hud-bubble {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .mood-stone {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .riverbank-island,
+  .mood-stone,
+  .hud-bubble {
+    transition: none !important;
+  }
+
+  .mood-stone:hover,
+  .hud-bubble:hover {
+    transform: none;
+  }
+}
