@@ -255,30 +255,36 @@ export default function RiverCanvas({
       const wind = Math.sin(t * 0.0011) * (0.3 + sev * 1.4) + sev * 0.9
 
       // --- the river path -------------------------------------------------
+      // The stream comes toward the viewer: a sliver at the horizon, wide at
+      // the bottom edge, meandering a little on the way down. Perspective is
+      // the eased `depth`, which also drives scale and width.
       const N = 80
       const path: Sample[] = []
-      // Where the stream ends: off the right edge normally; short of a side
-      // panel or bottom sheet when the layout has one.
-      const { rightInset, bottomInset } = layoutRef.current
-      const xEnd = rightInset > 0 ? w - rightInset + 24 : 1.06 * w
-      const bottomMargin = bottomInset > 0 ? bottomInset + 12 : h * (narrow ? 0.3 : 0.16)
+      const { bottomInset } = layoutRef.current
       for (let i = 0; i <= N; i++) {
         const u = i / N
+        const depth = u ** 1.15
+        // The meander lives in the narrow upper 65% and dies out smoothly
+        // (sin² has zero slope at its ends): an offset bank wider than the
+        // centerline's bend radius folds into a fin, so the wide foreground
+        // must run straight toward the viewer.
+        const envelope = Math.sin(Math.PI * Math.min(u / 0.65, 1)) ** 2
+        // gentle: the bend radius must stay larger than the bank offset
+        const meander =
+          (Math.sin(u * 3.2 + 0.6) * w * 0.05 + Math.sin(u * 7 + 2) * w * 0.012) * envelope
+        // foreground width scales with the frame but is capped by its height,
+        // so an ultra-wide screen doesn't become a delta
+        const hwMax = Math.min(w * 0.34, h * 0.55)
         path.push({
           u,
-          x: lerp(-0.06 * w, xEnd, u),
-          // narrow frames end the stream higher, clear of the scene caption
-          y:
-            horizon +
-            h * 0.07 +
-            Math.max(h * 0.25, h - horizon - bottomMargin) * u ** 1.08 +
-            Math.sin(u * 6.5 + 1.2) * h * 0.035,
+          x: w * 0.52 + meander,
+          y: horizon + h * 0.02 + (h - horizon + 30) * depth,
           tx: 0,
           ty: 0,
           nx: 0,
           ny: 0,
-          s: 0.55 + 0.7 * u,
-          hw: lerp(w * 0.022, w * 0.075, u) * (narrow ? 1.3 : 1),
+          s: 0.5 + 0.85 * depth,
+          hw: lerp(w * 0.012, hwMax, depth) * (narrow ? 1.15 : 1),
         })
       }
       for (let i = 0; i <= N; i++) {
@@ -309,6 +315,33 @@ export default function RiverCanvas({
           }
         }
         return { d: bd, sp: best }
+      }
+      // The stream runs under the panel/sheet, but people and landmarks
+      // stay above it: uMax is how far downstream anything placeable may go.
+      const limitY = h - (bottomInset > 0 ? bottomInset + 28 : 44)
+      let uMax = 1
+      for (const sp of path) {
+        if (sp.y > limitY) {
+          uMax = sp.u
+          break
+        }
+      }
+      uMax = Math.max(0.3, uMax - 0.04)
+      const bigTreeU = Math.min(BIG_TREE.u, uMax * 0.7)
+      const bigRockU = Math.min(BIG_ROCK.u, uMax * 0.78)
+      // A desktop panel only covers the middle of the wide foreground, so a
+      // spot that would sit under it moves to the outer water beside it; only
+      // when that's blocked too (or on a phone sheet) does it move upstream.
+      const panelHalf = Math.min(540, w * 0.92) / 2 + 16
+      const blocked = (q: { x: number; y: number }) =>
+        bottomInset > 0 &&
+        q.y > limitY &&
+        (narrow || (q.x > w / 2 - panelHalf && q.x < w / 2 + panelHalf))
+      const place = (u: number, lane: number) => {
+        let q = pointAt(u, lane)
+        if (blocked(q) && !narrow) q = pointAt(u, (lane < 0 ? -1 : 1) * 0.95)
+        if (blocked(q)) q = pointAt(Math.min(u, uMax), lane)
+        return q
       }
 
       // --- sky ------------------------------------------------------------
@@ -432,7 +465,7 @@ export default function RiverCanvas({
         if (x < -30 || x > w + 30 || y < horizon + 8 || y > h + 10) continue
         trees.push({ x, y, s: (0.5 + sp.s * 0.6) * tr.size, shade: tr.shade, big: false })
       }
-      const bigSp = sampleAt(BIG_TREE.u)
+      const bigSp = sampleAt(bigTreeU)
       const bigDist = bigSp.hw + 34 * bigSp.s
       const bigTree: Tree = {
         x: bigSp.x + bigDist * bigSp.nx,
@@ -613,7 +646,39 @@ export default function RiverCanvas({
         return { x, y, size, sp }
       }
       for (const rk of scenery.rocks) drawRock(rk.u, rk.lane, rk.size)
-      const bigRock = drawRock(BIG_ROCK.u, BIG_ROCK.lane, BIG_ROCK.size)
+      const bigRock = drawRock(bigRockU, BIG_ROCK.lane, BIG_ROCK.size)
+
+      // a small wooden dock off the right bank
+      {
+        const dockU = Math.min(0.5, uMax * 0.85)
+        const a = pointAt(dockU, 1.1)
+        const b = pointAt(dockU, 0.5)
+        const dw = 12 * a.sp.s
+        ctx.strokeStyle = WOOD
+        ctx.lineWidth = dw
+        ctx.lineCap = 'butt'
+        ctx.beginPath()
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+        ctx.stroke()
+        ctx.strokeStyle = WOOD_DARK
+        ctx.lineWidth = 1
+        for (let k = 1; k < 7; k++) {
+          const f = k / 7
+          const px = lerp(a.x, b.x, f)
+          const py = lerp(a.y, b.y, f)
+          ctx.beginPath()
+          ctx.moveTo(px - (a.sp.tx * dw) / 2, py - (a.sp.ty * dw) / 2)
+          ctx.lineTo(px + (a.sp.tx * dw) / 2, py + (a.sp.ty * dw) / 2)
+          ctx.stroke()
+        }
+        ctx.fillStyle = WOOD_DARK
+        for (const f of [0.5, 1]) {
+          const px = lerp(a.x, b.x, f)
+          const py = lerp(a.y, b.y, f)
+          ctx.fillRect(px - 1.6 * a.sp.s, py, 3.2 * a.sp.s, 8 * a.sp.s)
+        }
+      }
 
       // reeds along both banks
       for (const rd of scenery.reeds) {
@@ -700,11 +765,11 @@ export default function RiverCanvas({
           // shared water spots fan out along the current, so everyone stays
           // on the stream line instead of drifting onto a bank or under a panel
           case 'headwater': {
-            const { x, y, sp } = pointAt(0.1, 0)
+            const { x, y, sp } = place(0.1, 0)
             return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           case 'rapids': {
-            const { x, y, sp } = pointAt(0.47, 0.3)
+            const { x, y, sp } = place(0.47, 0.3)
             return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           case 'rock': {
@@ -721,11 +786,11 @@ export default function RiverCanvas({
             return { x: bigTree.x - 12 * bigTree.s + fan(k, n) * s, y: bigTree.y + 6 * bigTree.s, s, onLand: true }
           }
           case 'shallows': {
-            const { x, y, sp } = pointAt(narrow ? 0.64 : 0.74, -0.82)
+            const { x, y, sp } = place(0.8, -0.82)
             return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           case 'eddy': {
-            const { x, y, sp } = pointAt(narrow ? 0.82 : 0.9, 0.25)
+            const { x, y, sp } = place(0.9, 0.25)
             return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           default:
@@ -744,8 +809,8 @@ export default function RiverCanvas({
       const drifters = bySpot.get('drift') ?? []
       const lanes = narrow ? [-0.55, 0.55, 0] : [-0.4, 0.4, 0, -0.2, 0.2]
       drifters.forEach((m, k) => {
-        const u = 0.14 + ((k + 0.5) / drifters.length) * 0.78
-        const { x, y, sp } = pointAt(u, lanes[k % lanes.length])
+        const u = 0.14 + ((k + 0.5) / drifters.length) * 0.74
+        const { x, y, sp } = place(u, lanes[k % lanes.length])
         placed.push({ m, x, y, s: sp.s, onLand: false, i: gi++ })
       })
 

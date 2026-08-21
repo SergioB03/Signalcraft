@@ -349,6 +349,27 @@ floating over it and riverstone mood selectors. Adapted rather than pasted:
   style. That's an image; ours is drawn live so the weather, spots, and poses
   can change in every open window — the whole point of the app.
 
+### The river, final form (Fri late morning): toward the viewer
+
+The developer preferred the mockup's river running toward the viewer. Because
+the scene is built on a sampled path, that was a change to the path generator
+(narrow at the horizon, wide at the bottom edge, perspective scale from an
+eased depth), not a rewrite — banks, reeds, drops, rocks, flow, and spots all
+followed. Added a small wooden dock off the right bank.
+
+Two offset-curve lessons, both found by screenshots at several widths:
+
+- **A bank folds into a fin when the half-width exceeds the centerline's bend
+  radius.** First fix (fade the meander to zero at the bottom) moved the fold
+  upstream into a hook. Real fix: a gentle meander confined to the narrow
+  upper 65% with a sin² envelope (zero slope at its end), and the foreground
+  half-width capped by frame height so ultra-wide screens don't get a delta.
+- **Placement vs. panels.** On desktop the panel only covers the middle of
+  the wide foreground, so a spot that would sit under it moves to the outer
+  water beside it; only if that's blocked too (or on a phone sheet) does it
+  move upstream. People in the foreground beside the panel read like the
+  mockup's characters. Shared water spots fan along the current.
+
 ### Color and character (Fri ~4:30 AM): the people stop being stick figures
 
 The developer's last note: still too plain, characters too basic, more color.

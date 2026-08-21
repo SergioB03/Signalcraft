@@ -236,7 +236,7 @@
   width: 54px;
   height: 54px;
   border: none;
-  background: var(--silt);
+  background: radial-gradient(circle at 35% 30%, #5d6a77, #2e3944 72%);
   color: var(--foam);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -253,7 +253,7 @@
 }
 
 :root[data-theme='light'] .mood-stone {
-  background: #cfd8de;
+  background: radial-gradient(circle at 35% 30%, #e6ebef, #b7c2ca 75%);
   color: var(--foam);
 }
 
