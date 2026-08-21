@@ -25,19 +25,19 @@
   height: 100%;
 }
 
-/* header floats over the sky */
+/* a slim header over the sky: just the actions, right-aligned */
 .viewport-header {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 15;
-  background: linear-gradient(to bottom, rgba(27, 32, 39, 0.78), rgba(27, 32, 39, 0));
+  background: linear-gradient(to bottom, rgba(27, 32, 39, 0.55), rgba(27, 32, 39, 0));
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: 1rem;
-  padding: 14px 24px 28px;
+  padding: 12px 24px 26px;
   pointer-events: none;
   margin: 0;
 }
@@ -46,34 +46,22 @@
   pointer-events: auto;
 }
 
-.viewport-header .brand,
-.viewport-header .tab,
 .viewport-header .link {
   color: #e6edf2;
-}
-
-.viewport-header .tab {
-  opacity: 0.75;
-}
-
-.viewport-header .tab:hover,
-.viewport-header .tab.active {
-  opacity: 1;
-  background: rgba(230, 237, 242, 0.16);
-  border-color: rgba(230, 237, 242, 0.25);
 }
 
 .viewport-header .header-actions {
   margin-left: 0;
 }
 
-/* the scene name, bottom-left, over the bank */
+/* the scene name, top-left, over the sky */
 .hud-label {
   position: absolute;
   left: 24px;
-  bottom: 24px;
+  top: 48px;
+  bottom: auto;
   right: auto;
-  max-width: min(48vw, 560px);
+  max-width: min(60vw, 620px);
   z-index: 5;
 }
 
@@ -103,31 +91,91 @@
   box-shadow: 0 8px 32px rgba(27, 32, 39, 0.12);
 }
 
-.dock-right {
-  top: 76px;
-  right: 24px;
+/* bottom-center, no transform needed: auto margins center it */
+.dock-bottom {
+  left: 0;
+  right: 0;
   bottom: 24px;
-  width: 360px;
+  margin: 0 auto;
+  width: min(540px, 92vw);
+  max-height: min(54vh, 560px);
 }
 
 .island-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: 0.9rem 1.1rem 0.4rem;
-  font-family: 'Fraunces', Georgia, serif;
-  font-weight: 600;
-  font-size: 1.05rem;
+  padding: 0.85rem 1.2rem 0;
   flex: none;
+}
+
+.island-head .brand {
+  font-size: 1.3rem;
+}
+
+/* tabs live inside the panel, underlined with a pebble of a dot */
+.island-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 1.6rem;
+  padding: 0.2rem 1.2rem 0;
+  margin-bottom: 0.25rem;
+  flex: none;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.island-tabs .tab {
+  position: relative;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0.45rem 0.1rem 0.55rem;
+  color: inherit;
+  opacity: 0.6;
+  font-weight: 500;
+}
+
+.island-tabs .tab:hover {
+  opacity: 0.9;
+  background: none;
+}
+
+.island-tabs .tab.active {
+  opacity: 1;
+  font-weight: 600;
+  background: none;
+}
+
+.island-tabs .tab.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: var(--reed);
+  box-shadow: 0 0 8px var(--reed);
 }
 
 .island-body {
   flex: 1;
   overflow-y: auto;
-  padding: 0.2rem 1.1rem 1.2rem;
+  padding: 0.6rem 1.2rem 1.2rem;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+}
+
+/* the stones take center stage on the ping tab */
+.island-body .ping .mood-selector-container {
+  justify-content: center;
+  gap: 14px;
+}
+
+.island-body .ping .mood-caption {
+  text-align: center;
 }
 
 /* our cards flatten inside the glass */
@@ -251,30 +299,32 @@
 @media (max-width: 600px) {
   .viewport-header {
     padding: 10px 14px 22px;
-    flex-wrap: wrap;
-  }
-
-  .viewport-header .tabs {
-    order: 3;
-    flex-basis: 100%;
   }
 
   .hud-label {
     left: 14px;
     right: 14px;
-    top: 110px;
+    top: 52px;
     bottom: auto;
     max-width: none;
   }
 
-  .riverbank-island.dock-right {
-    top: auto;
+  .riverbank-island.dock-bottom {
     left: 0;
     right: 0;
     bottom: 0;
     width: 100%;
     max-height: 54vh;
     border-radius: 20px 20px 0 0;
+  }
+
+  .island-tabs {
+    gap: 1rem;
+    overflow-x: auto;
+    justify-content: flex-start;
+    /* App.css's old header rule pushes .tabs to the end on phones; not here */
+    order: 0;
+    flex-basis: auto;
   }
 
   .hud-bubble {

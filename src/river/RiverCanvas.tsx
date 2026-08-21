@@ -692,17 +692,20 @@ export default function RiverCanvas({
       const list = membersRef.current
       const bySpot = new Map<Spot, RiverMember[]>()
       list.forEach((m) => bySpot.set(m.spot, [...(bySpot.get(m.spot) ?? []), m]))
-      const fan = (k: number, n: number) => (k - (n - 1) / 2) * 11
+      // wide enough that two name tags on one spot don't collide
+      const fan = (k: number, n: number) => (k - (n - 1) / 2) * 28
 
       const anchor = (spot: Spot, k: number, n: number) => {
         switch (spot) {
+          // shared water spots fan out along the current, so everyone stays
+          // on the stream line instead of drifting onto a bank or under a panel
           case 'headwater': {
             const { x, y, sp } = pointAt(0.1, 0)
-            return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
+            return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           case 'rapids': {
-            const { x, y, sp } = pointAt(0.55, 0.5)
-            return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
+            const { x, y, sp } = pointAt(0.52, 0.35)
+            return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           case 'rock': {
             const s = bigRock.sp.s
@@ -723,7 +726,7 @@ export default function RiverCanvas({
           }
           case 'eddy': {
             const { x, y, sp } = pointAt(narrow ? 0.82 : 0.9, 0.25)
-            return { x: x + fan(k, n) * sp.nx * sp.s, y: y + fan(k, n) * sp.ny * sp.s, s: sp.s, onLand: false }
+            return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           default:
             return null

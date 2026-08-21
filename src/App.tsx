@@ -33,7 +33,7 @@ const ANONYMITY_FLOOR = 5
 type WeatherRow = Schema['WeatherState']['type']
 type MembershipRow = Schema['Membership']['type']
 type Stage = 'loading' | 'signIn' | 'signUp' | 'confirm' | 'forgot' | 'resetConfirm' | 'in'
-type View = 'river' | 'team' | 'report' | 'dev'
+type View = 'ping' | 'you' | 'team' | 'report' | 'dev'
 
 const POSES: Array<{ pose: AvatarPose; label: string }> = [
   { pose: 'floating', label: 'floating' },
@@ -75,7 +75,7 @@ function useTheme() {
 function useHashView(available: View[]): [View, (v: View) => void] {
   const read = useCallback((): View => {
     const h = window.location.hash.replace('#', '') as View
-    return available.includes(h) ? h : 'river'
+    return available.includes(h) ? h : 'ping'
   }, [available])
   const [view, setViewState] = useState<View>(read)
   useEffect(() => {
@@ -85,7 +85,7 @@ function useHashView(available: View[]): [View, (v: View) => void] {
     return () => window.removeEventListener('hashchange', onChange)
   }, [read])
   const setView = (v: View) => {
-    window.location.hash = v === 'river' ? '' : v
+    window.location.hash = v === 'ping' ? '' : v
     setViewState(v)
   }
   return [view, setView]
@@ -394,7 +394,13 @@ function Home({
   onToggleTheme: () => void
 }) {
   const { isLead, isDev } = useGroups()
-  const views: View[] = ['river', 'team', ...(isLead ? (['report'] as View[]) : []), ...(isDev ? (['dev'] as View[]) : [])]
+  const views: View[] = [
+    'ping',
+    'you',
+    'team',
+    ...(isLead ? (['report'] as View[]) : []),
+    ...(isDev ? (['dev'] as View[]) : []),
+  ]
   const [view, setView] = useHashView(views)
 
   const [weather, setWeather] = useState<WeatherRow | null>(null)
@@ -526,27 +532,10 @@ function Home({
           scene={shownScene}
           members={riverMembers}
           fill
-          rightInset={!viewport.narrow && !collapsed ? 384 : 0}
-          bottomInset={viewport.narrow && !collapsed ? Math.round(viewport.height * 0.54) : 0}
+          bottomInset={collapsed ? 0 : Math.round(viewport.height * (viewport.narrow ? 0.54 : 0.44))}
         />
       </div>
       <header className="viewport-header">
-        <span className="brand">undercurrent</span>
-        <nav className="tabs" aria-label="sections">
-          {views.map((v) => (
-            <button
-              key={v}
-              className={view === v ? 'tab active' : 'tab'}
-              aria-current={view === v ? 'page' : undefined}
-              onClick={() => {
-                setView(v)
-                setCollapsed(false)
-              }}
-            >
-              {v}
-            </button>
-          ))}
-        </nav>
         <span className="header-actions">
           <button
             className="link"
@@ -588,15 +577,28 @@ function Home({
           ≈
         </button>
       ) : (
-      <aside className="riverbank-island dock-right" aria-label={`${view} panel`}>
+      <aside className="riverbank-island dock-bottom" aria-label={`${view} panel`}>
         <div className="island-head">
-          <span>{view === 'river' ? 'you, on the river' : view}</span>
+          <span className="brand">undercurrent</span>
           <button className="link subtle" onClick={() => setCollapsed(true)}>
             hide
           </button>
         </div>
+        <nav className="tabs island-tabs" aria-label="sections">
+          {views.map((v) => (
+            <button
+              key={v}
+              className={view === v ? 'tab active' : 'tab'}
+              aria-current={view === v ? 'page' : undefined}
+              onClick={() => setView(v)}
+            >
+              {v}
+            </button>
+          ))}
+        </nav>
         <div className="island-body">
-      {view === 'river' && (
+      {view === 'ping' && <PingForm />}
+      {view === 'you' && (
         <>
           <section className="card" aria-label="your avatar pose">
             <p className="muted">
@@ -636,7 +638,6 @@ function Home({
             {poseError && <p className="error">{poseError}</p>}
             <NameEditor current={me?.displayName ?? ''} disabled={!myMembershipId} onSave={saveName} />
           </section>
-          <PingForm />
         </>
       )}
 
