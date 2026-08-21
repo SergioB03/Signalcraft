@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   confirmResetPassword,
   confirmSignUp,
@@ -15,7 +15,7 @@ import { generateClient } from 'aws-amplify/data'
 import gsap from 'gsap'
 import type { Schema } from '../amplify/data/resource'
 import RiverCanvas from './river/RiverCanvas'
-import { SCENES, SCENE_ORDER, SPOTS, memberColor } from './river/scenes'
+import { SCENES, SCENE_ORDER, SPOTS, memberColor, sceneFor } from './river/scenes'
 import type { AvatarPose, RiverMember, SceneName, Spot } from './river/scenes'
 import BlurText from './ui/BlurText'
 import LoginHorizon from './ui/LoginHorizon'
@@ -45,6 +45,32 @@ const POSES: Array<{ pose: AvatarPose; label: string }> = [
 ]
 const poseLabel = (pose: string | null | undefined) =>
   POSES.find((p) => p.pose === pose)?.label ?? 'floating'
+
+// --- the simulation: a private sandbox for visitors ------------------------
+// Six made-up teammates with random moods; the visitor is the seventh and
+// last to ping, so their choice decides the weather. Nothing here touches
+// the real team's data.
+const SIM_NAMES = ['rae', 'milo', 'sol', 'ivy', 'noor', 'beck']
+const SIM_POSES: AvatarPose[] = ['floating', 'waving', 'raft', 'underwater', 'coconut', 'floating']
+const SIM_SPOTS: Spot[] = ['drift', 'headwater', 'rapids', 'shallows', 'shade', 'eddy']
+
+type SimMember = { id: string; displayName: string; pose: AvatarPose; spot: Spot; score: number }
+
+function simCast(seed: number): SimMember[] {
+  const r = (i: number) => {
+    const x = Math.sin(seed * 9301 + i * 49297) * 233280
+    return x - Math.floor(x)
+  }
+  return SIM_NAMES.map((name, i) => ({
+    id: `sim-${seed}-${i}`,
+    displayName: name,
+    pose: SIM_POSES[Math.floor(r(i) * SIM_POSES.length)],
+    spot: SIM_SPOTS[Math.floor(r(i + 10) * SIM_SPOTS.length)],
+    score: 1 + Math.floor(r(i + 20) * 5),
+  }))
+}
+
+const isDemoEmail = (email?: string) => !!email && email.endsWith('@undercurrent.local')
 
 // ---------------------------------------------------------------------------
 // small hooks
@@ -415,6 +441,36 @@ function Home({
   const [collapsed, setCollapsed] = useState(false)
   const viewport = useViewport()
 
+  // Simulation: on by default for real sign-ups (community visitors), off for
+  // the demo cast, leads, and dev; the visitor's choice is remembered.
+  const [simPref, setSimPref] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('uc-sim')
+    } catch {
+      return null
+    }
+  })
+  const [demoAccount, setDemoAccount] = useState<boolean | null>(null)
+  const sim = simPref ? simPref === 'on' : demoAccount === false && !isLead && !isDev
+  const setSim = (on: boolean) => {
+    setSimPref(on ? 'on' : 'off')
+    try {
+      localStorage.setItem('uc-sim', on ? 'on' : 'off')
+    } catch {
+      /* fine */
+    }
+  }
+  const [simSeed, setSimSeed] = useState(() => Math.floor(Math.random() * 1e6))
+  const [simScore, setSimScore] = useState<number | null>(null)
+  const cast = useMemo(() => simCast(simSeed), [simSeed])
+  const simScores = simScore === null ? cast.map((c) => c.score) : [...cast.map((c) => c.score), simScore]
+  const simScene: SceneName = simScore === null ? 'gathering' : sceneFor(simScores)
+  const simAvg = simScores.reduce((a, b) => a + b, 0) / simScores.length
+  const resetSim = () => {
+    setSimSeed(Math.floor(Math.random() * 1e6))
+    setSimScore(null)
+  }
+
   // Make sure the demo team + my membership exist. Deterministic membership
   // id (`teamId#userId`) means StrictMode's double-run can't create dupes —
   // the second create loses the conditional write, same trick as receipts.
@@ -424,9 +480,10 @@ function Home({
       await client.models.Team.create({ id: TEAM_ID, name: 'Demo Team' }).catch(() => {})
       const { userId } = await getCurrentUser()
       const membershipId = `${TEAM_ID}#${userId}`
+      const attrs = await fetchUserAttributes().catch(() => ({ email: undefined }))
+      if (!cancelled) setDemoAccount(isDemoEmail(attrs.email))
       let mine = (await client.models.Membership.get({ id: membershipId })).data
       if (!mine) {
-        const attrs = await fetchUserAttributes().catch(() => ({ email: undefined }))
         const displayName = (attrs.email ?? 'someone').split('@')[0]
         const created = await client.models.Membership.create({
           id: membershipId,
@@ -484,15 +541,21 @@ function Home({
   }, [members, myMembershipId])
 
   const scene = (weather?.scene ?? null) as SceneName | null
-  const shownScene = preview ?? scene
+  const shownScene = preview ?? (sim ? simScene : scene)
   const myPose = members.find((m) => m.id === myMembershipId)?.avatarPose ?? 'floating'
-  const riverMembers: RiverMember[] = members.map((m) => ({
+  const realMembers: RiverMember[] = members.map((m) => ({
     id: m.id,
     displayName: m.displayName,
     pose: (m.avatarPose ?? 'floating') as AvatarPose,
     spot: (m.spot ?? 'drift') as Spot,
     isMe: m.userId === myUserId,
   }))
+  const riverMembers: RiverMember[] = sim
+    ? [
+        ...cast.map((c) => ({ id: c.id, displayName: c.displayName, pose: c.pose, spot: c.spot, isMe: false })),
+        ...realMembers.filter((m) => m.isMe),
+      ]
+    : realMembers
   const mySpot = (members.find((m) => m.id === myMembershipId)?.spot ?? 'drift') as Spot
 
   const setSpot = async (spot: Spot) => {
@@ -536,7 +599,18 @@ function Home({
         />
       </div>
       <header className="viewport-header">
+        <span className="dev-notice" role="status">
+          <span className="notice-long">
+            {sim
+              ? 'preview build · simulated experience — nothing here reaches a real team'
+              : 'preview build · live demo team'}
+          </span>
+          <span className="notice-short">{sim ? 'simulated' : 'preview'}</span>
+        </span>
         <span className="header-actions">
+          <button className="link" onClick={() => setSim(!sim)} aria-pressed={sim}>
+            {sim ? 'simulation: on' : 'simulate'}
+          </button>
           <button
             className="link"
             onClick={onToggleTheme}
@@ -559,11 +633,24 @@ function Home({
                 {SCENES[preview].caption}.
               </>
             )}
-            {!preview && scene === null && "nobody's pinged yet today — set the tone."}
+            {!preview && sim && simScore === null && (
+              <>
+                <span className="preview-pill">simulated</span>6 of 7 have pinged — you're the last
+                one. your ping decides the weather.
+              </>
+            )}
+            {!preview && sim && simScore !== null && (
+              <>
+                <span className="preview-pill">simulated</span>
+                {SCENES[simScene].caption} — 7 pings, average {simAvg.toFixed(1)}. you set this.
+              </>
+            )}
+            {!preview && !sim && scene === null && "nobody's pinged yet today — set the tone."}
             {!preview &&
+              !sim &&
               scene === 'gathering' &&
               `waiting on a few more before the water shows — pings stay anonymous. (${pingCount} of ${ANONYMITY_FLOOR} so far)`}
-            {!preview && scene !== null && scene !== 'gathering' && (
+            {!preview && !sim && scene !== null && scene !== 'gathering' && (
               <>
                 {SCENES[scene].caption} — {pingCount} ping{pingCount === 1 ? '' : 's'} today
                 {typeof weather?.score === 'number' && `, average ${weather.score.toFixed(1)}`}
@@ -597,7 +684,18 @@ function Home({
           ))}
         </nav>
         <div className="island-body">
-      {view === 'ping' && <PingForm />}
+      {view === 'ping' &&
+        (sim ? (
+          <SimPingForm
+            score={simScore}
+            scene={simScene}
+            onPing={setSimScore}
+            onReset={resetSim}
+            onAgain={() => setSimScore(null)}
+          />
+        ) : (
+          <PingForm />
+        ))}
       {view === 'you' && (
         <>
           <section className="card" aria-label="your avatar pose">
@@ -987,6 +1085,87 @@ function DevPanel({
         ))}
       </ul>
       {result && <pre className="dev-result">{result}</pre>}
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ping (simulated): the same stones, but the score stays in this browser and
+// decides a simulated team's weather.
+
+function SimPingForm({
+  score,
+  scene,
+  onPing,
+  onReset,
+  onAgain,
+}: {
+  score: number | null
+  scene: SceneName
+  onPing: (s: number) => void
+  onReset: () => void
+  onAgain: () => void
+}) {
+  const [selected, setSelected] = useState<number | null>(null)
+  if (score !== null)
+    return (
+      <section className="card ping" aria-label="simulated ping">
+        <p className="pinged">
+          you pinged {score} — the river went <strong>{scene}</strong>. that's what one honest answer
+          does to a team's weather.
+        </p>
+        <div className="roster-actions">
+          <button
+            className="primary"
+            onClick={() => {
+              setSelected(null)
+              onReset()
+            }}
+          >
+            reset the simulation
+          </button>
+          <button
+            className="link subtle"
+            onClick={() => {
+              setSelected(null)
+              onAgain()
+            }}
+          >
+            ping again with the same teammates
+          </button>
+        </div>
+      </section>
+    )
+  return (
+    <section className="card ping" aria-label="simulated ping">
+      <h2 className="sr-only">drop a simulated ping</h2>
+      <div className="mood-selector-container" role="radiogroup" aria-label="your mood">
+        {MOODS.map((m) => (
+          <button
+            key={m.score}
+            role="radio"
+            aria-checked={selected === m.score}
+            aria-label={`${m.score} — ${m.label}`}
+            data-mood={m.score}
+            className={selected === m.score ? 'mood-stone selected' : 'mood-stone'}
+            onClick={() => setSelected(m.score)}
+          >
+            {m.score}
+          </button>
+        ))}
+      </div>
+      <p className="mood-caption" aria-live="polite">
+        {selected === null
+          ? 'six teammates have pinged. you decide the weather — 1 is sinking, 5 is glassy.'
+          : `${selected} — ${MOODS.find((m) => m.score === selected)?.label}. simulated, nothing is saved.`}
+      </p>
+      {selected !== null && (
+        <div className="ping-reveal">
+          <button className="primary" onClick={() => onPing(selected)}>
+            drop the ping
+          </button>
+        </div>
+      )}
     </section>
   )
 }

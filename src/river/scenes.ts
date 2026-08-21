@@ -173,6 +173,22 @@ export const SCENES: Record<SceneName, SceneSpec> = {
   },
 }
 
+/**
+ * The weather thresholds, mirrored from the compute-weather Lambda for the
+ * client-side SIMULATION only. Real weather is never computed in a browser —
+ * the server's WeatherState row is the single source of truth.
+ */
+export function sceneFor(scores: number[]): SceneName {
+  const n = scores.length
+  if (n < 5) return 'gathering'
+  const avg = scores.reduce((a, b) => a + b, 0) / n
+  if (avg >= 4.2) return 'clear'
+  if (avg >= 3.4) return 'breezy'
+  if (avg >= 2.6) return 'overcast'
+  if (avg >= 1.8) return 'rough'
+  return 'storm'
+}
+
 export type AvatarPose =
   | 'floating'
   | 'raft'

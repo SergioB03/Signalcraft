@@ -50,6 +50,22 @@
   color: #e6edf2;
 }
 
+/* "this is a preview" — always visible, never shouting */
+.dev-notice {
+  margin-right: auto;
+  padding: 0.2rem 0.7rem;
+  border-radius: 1rem;
+  background: rgba(230, 237, 242, 0.12);
+  border: 1px solid rgba(230, 237, 242, 0.25);
+  color: #e6edf2;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60vw;
+}
+
 .viewport-header .header-actions {
   margin-left: 0;
 }
@@ -360,15 +376,37 @@
 }
 
 /* 4. Phones: the island becomes a bottom sheet, the label moves up top */
+.notice-short {
+  display: none;
+}
+
 @media (max-width: 600px) {
   .viewport-header {
     padding: 10px 14px 22px;
+    gap: 0.6rem;
+  }
+
+  .viewport-header .header-actions {
+    gap: 0.6rem;
+    white-space: nowrap;
+  }
+
+  .notice-long {
+    display: none;
+  }
+
+  .notice-short {
+    display: inline;
+  }
+
+  .dev-notice {
+    max-width: none;
   }
 
   .hud-label {
     left: 14px;
     right: 14px;
-    top: 52px;
+    top: 56px;
     bottom: auto;
     max-width: none;
   }
