@@ -217,6 +217,28 @@
   font-weight: 600;
 }
 
+.name-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid color-mix(in srgb, var(--foam) 8%, transparent);
+}
+
+.name-editor p {
+  margin: 0;
+}
+
+.name-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.name-row input {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ------------------------------------------------------------------ moods */
 
 .moods {

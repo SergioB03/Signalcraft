@@ -20,6 +20,11 @@ type Palette = {
 }
 
 const TWEEN_MS = 2000
+// Phones report DPR 3: a 1170px-wide river becomes a 3500px backing store
+// redrawn 60×/s. Capping DPR and frame rate keeps it fluid on a phone at a
+// fraction of the cost; nobody can see the difference at these sizes.
+const MAX_DPR = 1.5
+const FRAME_MS = 1000 / 30
 
 function paletteFor(scene: SceneName): Palette {
   const s = SCENES[scene]
@@ -101,9 +106,10 @@ export default function RiverCanvas({ scene, members }: Props) {
 
     // The dpr used to size the backing store — draw() must divide by THIS,
     // not the live devicePixelRatio, or browser zoom mid-demo garbles the scene.
-    let dpr = window.devicePixelRatio || 1
+    const currentDpr = () => Math.min(MAX_DPR, window.devicePixelRatio || 1)
+    let dpr = currentDpr()
     const size = () => {
-      dpr = window.devicePixelRatio || 1
+      dpr = currentDpr()
       const w = wrap.clientWidth
       const h = Math.min(420, Math.max(240, Math.round(w * 0.45)))
       for (const c of [canvas, overlay]) {
@@ -210,7 +216,7 @@ export default function RiverCanvas({ scene, members }: Props) {
       }
 
       // rain — particle pool sized by density
-      const targetDrops = reducedMotion.matches ? 0 : Math.round(p.rain * 130)
+      const targetDrops = reducedMotion.matches ? 0 : Math.round(p.rain * 90)
       while (drops.length < targetDrops)
         drops.push({
           x: Math.random() * w,
@@ -293,11 +299,14 @@ export default function RiverCanvas({ scene, members }: Props) {
     }
     drawStaticRef.current = drawStatic
 
+    let lastFrame = 0
     const loop = (now: number) => {
-      // Self-heal on zoom / monitor moves: dpr changes don't fire ResizeObserver.
-      if ((window.devicePixelRatio || 1) !== dpr) size()
-      draw(now)
       raf = requestAnimationFrame(loop)
+      if (now - lastFrame < FRAME_MS) return
+      lastFrame = now
+      // Self-heal on zoom / monitor moves: dpr changes don't fire ResizeObserver.
+      if (currentDpr() !== dpr) size()
+      draw(now)
     }
 
     size()
@@ -307,18 +316,31 @@ export default function RiverCanvas({ scene, members }: Props) {
     })
     ro.observe(wrap)
 
+    // Don't burn frames nobody can see: background tab or scrolled away.
+    let inView = true
     const startOrStop = () => {
       cancelAnimationFrame(raf)
       if (reducedMotion.matches) drawStatic()
-      else raf = requestAnimationFrame(loop)
+      else if (!document.hidden && inView) raf = requestAnimationFrame(loop)
     }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        inView = entry?.isIntersecting ?? true
+        startOrStop()
+      },
+      { threshold: 0 },
+    )
+    io.observe(wrap)
     startOrStop()
     reducedMotion.addEventListener('change', startOrStop)
+    document.addEventListener('visibilitychange', startOrStop)
 
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      io.disconnect()
       reducedMotion.removeEventListener('change', startOrStop)
+      document.removeEventListener('visibilitychange', startOrStop)
     }
   }, [])
 
@@ -441,7 +463,7 @@ function drawAvatar(
   ctx.font = '11px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.fillStyle = m.isMe ? SUN : 'rgba(230, 237, 242, 0.85)'
-  ctx.fillText(m.displayName.slice(0, 12), 0, 22)
+  ctx.fillText(m.displayName.slice(0, 14), 0, 22)
 
   ctx.restore()
 }

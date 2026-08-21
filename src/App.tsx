@@ -296,6 +296,19 @@ function Home({
   const [members, setMembers] = useState<MembershipRow[]>([])
   const [myUserId, setMyUserId] = useState<string | null>(null)
   const [myMembershipId, setMyMembershipId] = useState<string | null>(null)
+  const [poseError, setPoseError] = useState('')
+
+  // Tokens are shared per browser: if another tab signs in as a different
+  // account, THIS tab's session silently becomes that account while its state
+  // still says "you are X" — poses and pings would land on the wrong person.
+  // Reload on any cross-tab auth change so "you" is always who the tokens say.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key?.includes('LastAuthUser') && e.newValue !== e.oldValue) window.location.reload()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   // Make sure the demo team + my membership exist. Deterministic membership
   // id (`teamId#userId`) means StrictMode's double-run can't create dupes —
@@ -366,9 +379,22 @@ function Home({
     isMe: m.userId === myUserId,
   }))
 
-  const setPose = (pose: AvatarPose) => {
+  const me = members.find((m) => m.id === myMembershipId) ?? null
+
+  const setPose = async (pose: AvatarPose) => {
     if (!myMembershipId) return
-    client.models.Membership.update({ id: myMembershipId, avatarPose: pose })
+    setPoseError('')
+    const { errors } = await client.models.Membership.update({ id: myMembershipId, avatarPose: pose })
+    if (errors)
+      setPoseError(
+        'could not change your pose — if you signed in as someone else in another tab, reload this one.',
+      )
+  }
+
+  const saveName = async (name: string): Promise<string | null> => {
+    if (!myMembershipId) return 'not on the river yet'
+    const { errors } = await client.models.Membership.update({ id: myMembershipId, displayName: name })
+    return errors ? errors.map((e) => e.message).join('; ') : null
   }
 
   const pingCount = weather?.pingCount ?? 0
@@ -442,6 +468,8 @@ function Home({
                 </button>
               ))}
             </div>
+            {poseError && <p className="error">{poseError}</p>}
+            <NameEditor current={me?.displayName ?? ''} disabled={!myMembershipId} onSave={saveName} />
           </section>
           <PingForm />
         </div>
@@ -458,6 +486,72 @@ function Home({
       {view === 'report' && isLead && <ReportPanel />}
       {view === 'dev' && isDev && <DevPanel />}
     </main>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// name
+
+function NameEditor({
+  current,
+  disabled,
+  onSave,
+}: {
+  current: string
+  disabled: boolean
+  onSave: (name: string) => Promise<string | null>
+}) {
+  const [draft, setDraft] = useState(current)
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  // Follow the live value (it arrives after mount, and can change elsewhere).
+  useEffect(() => {
+    setDraft(current)
+  }, [current])
+
+  const clean = draft.trim()
+  const unchanged = !clean || clean === current
+
+  const save = async () => {
+    if (unchanged) return
+    setStatus('saving')
+    const err = await onSave(clean)
+    setStatus(err ? 'error' : 'saved')
+  }
+
+  return (
+    <form
+      className="name-editor"
+      onSubmit={(e) => {
+        e.preventDefault()
+        save()
+      }}
+    >
+      <label>
+        your name on the river
+        <span className="name-row">
+          <input
+            value={draft}
+            maxLength={14}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              setStatus('idle')
+            }}
+            disabled={disabled}
+            aria-describedby="name-hint"
+          />
+          <button type="submit" disabled={disabled || status === 'saving' || unchanged}>
+            {status === 'saving' ? 'saving…' : 'save'}
+          </button>
+        </span>
+      </label>
+      <p id="name-hint" className="muted small">
+        {status === 'saved'
+          ? "saved — everyone's river updates live."
+          : status === 'error'
+            ? 'could not save your name — try again.'
+            : 'up to 14 characters; this is what floats under your avatar.'}
+      </p>
+    </form>
   )
 }
 
