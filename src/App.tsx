@@ -580,8 +580,8 @@ function Home({
       <aside className="riverbank-island dock-bottom" aria-label={`${view} panel`}>
         <div className="island-head">
           <span className="brand">undercurrent</span>
-          <button className="link subtle" onClick={() => setCollapsed(true)}>
-            hide
+          <button className="icon-btn" aria-label="hide the panel" title="hide" onClick={() => setCollapsed(true)}>
+            ⌄
           </button>
         </div>
         <nav className="tabs island-tabs" aria-label="sections">
@@ -1094,8 +1094,7 @@ function PingForm() {
 
   return (
     <section className="card ping" aria-label="today's ping">
-      <h2>drop today's ping</h2>
-      <p className="muted">one tap, anonymous, once a day.</p>
+      <h2 className="sr-only">drop today's ping</h2>
       <div className="mood-selector-container" role="radiogroup" aria-label="today's mood">
         {MOODS.map((m) => (
           <button
@@ -1113,20 +1112,24 @@ function PingForm() {
       </div>
       <p className="mood-caption" aria-live="polite">
         {selected === null
-          ? 'pick a stone — 1 is sinking, 5 is glassy.'
-          : `${selected} — ${MOODS.find((m) => m.score === selected)?.label}`}
+          ? 'how is the water today? 1 is sinking, 5 is glassy.'
+          : `${selected} — ${MOODS.find((m) => m.score === selected)?.label}. anonymous, once a day.`}
       </p>
-      <input
-        placeholder="optional note, 140 characters"
-        maxLength={140}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        aria-label="optional note"
-      />
-      {error && <p className="error">{error}</p>}
-      <button className="primary" disabled={selected === null || status === 'sending'} onClick={submit}>
-        {status === 'sending' ? 'sending…' : 'ping'}
-      </button>
+      {selected !== null && (
+        <div className="ping-reveal">
+          <input
+            placeholder="optional note, 140 characters"
+            maxLength={140}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            aria-label="optional note"
+          />
+          {error && <p className="error">{error}</p>}
+          <button className="primary" disabled={status === 'sending'} onClick={submit}>
+            {status === 'sending' ? 'sending…' : 'drop the ping'}
+          </button>
+        </div>
+      )}
     </section>
   )
 }

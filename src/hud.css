@@ -146,17 +146,81 @@
   background: none;
 }
 
+/* the mockup's marker: a short line under the label, a pebble below it */
+.island-tabs .tab.active::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 30px;
+  height: 2px;
+  margin-left: -15px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.9;
+}
+
 .island-tabs .tab.active::after {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: -4px;
+  bottom: -5px;
   width: 8px;
   height: 8px;
   margin-left: -4px;
   border-radius: 50%;
   background: var(--reed);
   box-shadow: 0 0 8px var(--reed);
+}
+
+.icon-btn {
+  background: none;
+  border: 0;
+  padding: 0 0.2rem;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.icon-btn:hover {
+  opacity: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ping-reveal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  animation: reveal 0.35s ease-out;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ping-reveal {
+    animation: none;
+  }
 }
 
 .island-body {

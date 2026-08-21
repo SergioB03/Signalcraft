@@ -370,6 +370,19 @@ Two offset-curve lessons, both found by screenshots at several widths:
   move upstream. People in the foreground beside the panel read like the
   mockup's characters. Shared water spots fan along the current.
 
+### Final cut (Fri ~12:45 PM): the mockup's panel and friendlier people
+
+- The ping panel is now exactly the mockup's three rows — brand, tabs with a
+  short underline and a pebble dot, five riverstones — with a single caption.
+  The note field and the ping button appear only after a stone is chosen.
+  "hide" became a chevron.
+- Characters got rounder heads with faces and smiles, hats by person (beanie,
+  cap, sun hat — hashed from the membership id like their color), broader
+  shoulders, thicker arms with hands, and black rubber inner tubes with a
+  stripe in their color. Drawn ~35% larger.
+- The article draft was written in parallel by a subagent from this file
+  while the last visual pass ran — the deadline stayed safe either way.
+
 ### Color and character (Fri ~4:30 AM): the people stop being stick figures
 
 The developer's last note: still too plain, characters too basic, more color.

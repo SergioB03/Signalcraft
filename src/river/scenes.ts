@@ -55,6 +55,10 @@ function hashId(id: string): number {
 export const memberColor = (id: string) => MEMBER_COLORS[hashId(id) % MEMBER_COLORS.length]
 export const memberHair = (id: string) => HAIR_COLORS[(hashId(id) >>> 3) % HAIR_COLORS.length]
 
+export type Hat = 'none' | 'beanie' | 'cap' | 'sunhat'
+const HATS: Hat[] = ['none', 'beanie', 'cap', 'sunhat']
+export const memberHat = (id: string): Hat => HATS[(hashId(id) >>> 5) % HATS.length]
+
 export const SCENE_ORDER: SceneName[] = [
   'gathering',
   'clear',

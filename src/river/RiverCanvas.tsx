@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { SCENES, hexToRgb, lerp, lerpRgb, memberColor, memberHair, rgbCss } from './scenes'
-import type { Rgb, RiverMember, SceneName, Spot } from './scenes'
+import { SCENES, hexToRgb, lerp, lerpRgb, memberColor, memberHair, memberHat, rgbCss } from './scenes'
+import type { Hat, Rgb, RiverMember, SceneName, Spot } from './scenes'
 
 type Props = {
   scene: SceneName | null
@@ -758,7 +758,7 @@ export default function RiverCanvas({
       const bySpot = new Map<Spot, RiverMember[]>()
       list.forEach((m) => bySpot.set(m.spot, [...(bySpot.get(m.spot) ?? []), m]))
       // wide enough that two name tags on one spot don't collide
-      const fan = (k: number, n: number) => (k - (n - 1) / 2) * 28
+      const fan = (k: number, n: number) => (k - (n - 1) / 2) * 40
 
       const anchor = (spot: Spot, k: number, n: number) => {
         switch (spot) {
@@ -829,7 +829,7 @@ export default function RiverCanvas({
         // On a phone, seven name tags can't fit — keep yours (unless it would
         // land in the caption band); the team tab names everyone.
         const nameFits = !narrow || (pl.m.isMe && pl.y + 14 * pl.s + 10 < h - 100)
-        drawAvatar(ctx, pl.m, pl.x, pl.y + bob, t, pl.i, pl.s * 1.15, pl.onLand, nameFits)
+        drawAvatar(ctx, pl.m, pl.x, pl.y + bob, t, pl.i, pl.s * 1.35, pl.onLand, nameFits)
       }
     }
 
@@ -918,6 +918,10 @@ export default function RiverCanvas({
 const SKIN = '#f0d6ba'
 const WOOD = '#8a6642'
 const WOOD_DARK = '#6e4f33'
+const RUBBER = '#22282e'
+// set per avatar before drawing, so head() can put the right hat on
+let curColor = FOAM_CSS
+let curHat: Hat = 'none'
 
 function drawAvatar(
   ctx: CanvasRenderingContext2D,
@@ -932,6 +936,8 @@ function drawAvatar(
 ) {
   const c = memberColor(m.id)
   const hair = memberHair(m.id)
+  curColor = c
+  curHat = memberHat(m.id)
   ctx.save()
   ctx.translate(x, y)
   ctx.save()
@@ -948,12 +954,12 @@ function drawAvatar(
   switch (m.pose) {
     case 'underwater': {
       ctx.globalAlpha = 0.62
-      head(ctx, 0, 7, hair)
-      // mask
+      head(ctx, 0, 8, hair)
+      // mask over the eyes
       ctx.fillStyle = FOAM_CSS
-      ctx.fillRect(-3.6, 5.6, 7.2, 3)
+      ctx.fillRect(-4.6, 6.6, 9.2, 3.6)
       ctx.fillStyle = '#6fb1c9'
-      ctx.fillRect(-3, 6.1, 6, 2)
+      ctx.fillRect(-4, 7.2, 8, 2.4)
       ctx.globalAlpha = 1
       // snorkel in their color, poking above the surface
       ctx.strokeStyle = c
@@ -1004,15 +1010,15 @@ function drawAvatar(
       ctx.lineTo(11, -10)
       ctx.closePath()
       ctx.fill()
-      torso(ctx, c, 0, -6)
-      head(ctx, 0, -14, hair)
-      arm(ctx, -5, -8, -8, -2)
-      arm(ctx, 5, -8, 8, -2)
+      torso(ctx, c, 0, -7)
+      head(ctx, 0, -17, hair)
+      arm(ctx, -6, -9, -9, -2)
+      arm(ctx, 6, -9, 9, -2)
       break
     }
     case 'struck': {
-      torso(ctx, c, 0, -3)
-      head(ctx, 0, -11, hair)
+      torso(ctx, c, 0, -4)
+      head(ctx, 0, -14, hair)
       // hair standing on end
       ctx.strokeStyle = hair
       ctx.lineWidth = 1.2
@@ -1101,33 +1107,34 @@ function drawAvatar(
       break
     }
     case 'waving': {
-      torso(ctx, c, 0, -3)
-      head(ctx, 0, -11, hair)
-      arm(ctx, -5, -5, -9, -1)
+      torso(ctx, c, 0, -4)
+      head(ctx, 0, -14, hair)
+      arm(ctx, -6, -6, -11, -1)
       const wave = Math.sin(t * 0.009 + i) * 3
-      arm(ctx, 5, -6, 8, -17 + wave)
-      ctx.fillStyle = SKIN
-      ctx.beginPath()
-      ctx.arc(8.3, -18.5 + wave, 1.7, 0, Math.PI * 2)
-      ctx.fill()
+      arm(ctx, 6, -7, 10, -20 + wave)
       break
     }
     default: {
-      // floating in an inner tube
-      torso(ctx, c, 0, -4)
+      // floating in a black rubber inner tube with a stripe in their color
+      torso(ctx, c, 0, -5)
+      ctx.strokeStyle = RUBBER
+      ctx.lineWidth = 5.5
+      ctx.beginPath()
+      ctx.ellipse(0, 0, 12.5, 6, 0, 0, Math.PI * 2)
+      ctx.stroke()
       ctx.strokeStyle = c
-      ctx.lineWidth = 4.2
+      ctx.lineWidth = 1.8
       ctx.beginPath()
-      ctx.ellipse(0, 0, 10.5, 5, 0, 0, Math.PI * 2)
+      ctx.ellipse(0, 0, 12.5, 6, 0, Math.PI * 0.15, Math.PI * 0.45)
       ctx.stroke()
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'
-      ctx.lineWidth = 1.3
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)'
+      ctx.lineWidth = 1.4
       ctx.beginPath()
-      ctx.ellipse(0, 0, 10.5, 5, 0, Math.PI * 1.1, Math.PI * 1.6)
+      ctx.ellipse(0, 0, 12.5, 6, 0, Math.PI * 1.1, Math.PI * 1.6)
       ctx.stroke()
-      head(ctx, 0, -12, hair)
-      arm(ctx, -4, -6, -9, -1)
-      arm(ctx, 4, -6, 9, -1)
+      head(ctx, 0, -14, hair)
+      arm(ctx, -5, -7, -11, -1)
+      arm(ctx, 5, -7, 11, -1)
     }
   }
   ctx.restore()
@@ -1137,7 +1144,7 @@ function drawAvatar(
     ctx.font = `${m.isMe ? '600 ' : ''}10.5px system-ui, sans-serif`
     ctx.textAlign = 'center'
     ctx.fillStyle = m.isMe ? SUN_CSS : c
-    ctx.fillText(m.displayName.slice(0, 14), 0, 14 * s + 10)
+    ctx.fillText(m.displayName.slice(0, 14), 0, 17 * s + 10)
   }
   ctx.restore()
 }
@@ -1149,25 +1156,60 @@ function lighten(hex: string): string {
 function torso(ctx: CanvasRenderingContext2D, color: string, x: number, y: number) {
   ctx.fillStyle = color
   ctx.beginPath()
-  ctx.roundRect(x - 5, y - 4, 10, 9, 3)
+  ctx.roundRect(x - 7, y - 5, 14, 11, 5)
   ctx.fill()
 }
 
+// A round, friendly head: face, hair, eyes, a smile, and the person's hat.
 function head(ctx: CanvasRenderingContext2D, x: number, y: number, hair: string) {
   ctx.fillStyle = SKIN
   ctx.beginPath()
-  ctx.arc(x, y, 5, 0, Math.PI * 2)
+  ctx.arc(x, y, 6.5, 0, Math.PI * 2)
   ctx.fill()
   ctx.fillStyle = hair
   ctx.beginPath()
-  ctx.arc(x, y - 0.4, 5.2, Math.PI * 1.02, Math.PI * 1.98)
+  ctx.arc(x, y - 0.6, 6.7, Math.PI * 1.02, Math.PI * 1.98)
   ctx.closePath()
   ctx.fill()
   ctx.fillStyle = '#2b2f36'
   ctx.beginPath()
-  ctx.arc(x - 1.8, y + 0.6, 0.7, 0, Math.PI * 2)
-  ctx.arc(x + 1.8, y + 0.6, 0.7, 0, Math.PI * 2)
+  ctx.arc(x - 2.3, y + 0.8, 0.85, 0, Math.PI * 2)
+  ctx.arc(x + 2.3, y + 0.8, 0.85, 0, Math.PI * 2)
   ctx.fill()
+  ctx.strokeStyle = '#2b2f36'
+  ctx.lineWidth = 0.9
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.arc(x, y + 2.2, 2.4, Math.PI * 0.15, Math.PI * 0.85)
+  ctx.stroke()
+  if (curHat === 'beanie') {
+    ctx.fillStyle = curColor
+    ctx.beginPath()
+    ctx.arc(x, y - 1.2, 6.9, Math.PI * 1.02, Math.PI * 1.98)
+    ctx.closePath()
+    ctx.fill()
+    ctx.fillStyle = lighten(curColor)
+    ctx.fillRect(x - 6.9, y - 2.8, 13.8, 1.8)
+  } else if (curHat === 'cap') {
+    ctx.fillStyle = curColor
+    ctx.beginPath()
+    ctx.arc(x, y - 1.4, 6.8, Math.PI * 1.02, Math.PI * 1.98)
+    ctx.closePath()
+    ctx.fill()
+    ctx.beginPath()
+    ctx.ellipse(x + 4.8, y - 1.7, 5.2, 1.5, 0, 0, Math.PI * 2)
+    ctx.fill()
+  } else if (curHat === 'sunhat') {
+    ctx.fillStyle = '#d9c18a'
+    ctx.beginPath()
+    ctx.ellipse(x, y - 2.2, 10.5, 2.4, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(x, y - 2.6, 6.4, Math.PI, 0)
+    ctx.fill()
+    ctx.fillStyle = curColor
+    ctx.fillRect(x - 6.4, y - 3.8, 12.8, 1.6)
+  }
 }
 
 function arm(
@@ -1178,10 +1220,14 @@ function arm(
   y2: number,
 ) {
   ctx.strokeStyle = SKIN
-  ctx.lineWidth = 2.2
+  ctx.lineWidth = 3
   ctx.lineCap = 'round'
   ctx.beginPath()
   ctx.moveTo(x1, y1)
   ctx.lineTo(x2, y2)
   ctx.stroke()
+  ctx.fillStyle = SKIN
+  ctx.beginPath()
+  ctx.arc(x2, y2, 1.9, 0, Math.PI * 2)
+  ctx.fill()
 }
