@@ -59,6 +59,36 @@ exchange for an unblocked pipeline, per the "simpler version after 30 minutes" r
 Lesson: `npm install` resolves and may update the lockfile; `npm ci` installs exactly
 the lockfile or refuses — CI uses the strict one so builds can't drift.
 
+### Milestone: pipeline green
+
+Build #2 succeeded after the amplify.yml fix; the live URL serves the app. Per the
+spec's gate, feature work started only after this point.
+
+### Backend implemented: schema, weather Lambda, stream wiring
+
+- **One-ping-per-day via deterministic id.** PingReceipt's id is
+  `${userId}#${dayKey}`. Amplify's create mutation carries a built-in
+  `attribute_not_exists(id)` condition, so the second receipt of a day is rejected
+  by DynamoDB itself — uniqueness enforcement with zero custom resolver code.
+- **Known gap, logged honestly:** the receipt+ping pair is orchestrated by the
+  client, so a hand-crafted API call could create a Ping without a receipt. Full
+  enforcement needs a custom mutation doing both writes server-side — Tier 2
+  hardening if time allows; the article should mention it either way.
+- **Weather trigger = DynamoDB stream → Lambda**, the documented Gen 2 pattern
+  (EventSourceMapping + stream-read policy in backend.ts). The Lambda then updates
+  WeatherState **through an AppSync mutation with IAM auth** — never a direct
+  table write, because subscriptions only fire on mutations through AppSync.
+- **Circular-dependency gotcha:** a function that both reads the data API and is
+  triggered by a data-stack table stream must live in the data stack —
+  `resourceGroupName: 'data'` on defineFunction. Without it, CDK stack A needs B
+  and B needs A, and the deploy fails.
+- **Anonymity floor server-side:** below 5 pings the Lambda publishes scene
+  `gathering` with the ping count but a null average — a 2-ping average is close
+  to an individual answer, so it never leaves the server.
+- **Realtime proof as a script, not an eyeball test:** scripts/prove-realtime.ts
+  signs in, subscribes to WeatherState, submits a ping, and fails loudly if no
+  subscription event lands within 30s. Repeatable evidence for the riskiest wire.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root

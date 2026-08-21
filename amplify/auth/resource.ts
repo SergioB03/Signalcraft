@@ -1,11 +1,13 @@
 import { defineAuth } from '@aws-amplify/backend';
 
 /**
- * Define and configure your auth resource
- * @see https://docs.amplify.aws/gen2/build-a-backend/auth
+ * Email/password sign-in. Two groups per the spec: `lead` sees reports,
+ * `member` is everyone else. Group assignment is manual for the demo
+ * (Cognito console or CLI) — no self-service role escalation.
  */
 export const auth = defineAuth({
   loginWith: {
     email: true,
   },
+  groups: ['lead', 'member'],
 });
