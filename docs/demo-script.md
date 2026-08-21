@@ -7,12 +7,17 @@ signed in as `demo2` (kai).** Tabs share a login; private windows don't.
 Before recording, **on the public URL** (the sandbox is a different backend —
 the in-app button is the safe path):
 
-1. In a third private window, sign in as `dev@undercurrent.local` → **dev** tab
-   → **wipe and reseed**. The river is now past the floor, nobody has pinged
+1. In the **left window as ana**, open the **dev** tab → **wipe and reseed**
+   (run → confirm). Leads have the test-environment controls, so no third
+   account is needed. The river is now past the floor, nobody has pinged
    today, and any existing report is kept.
-2. Switch that window to the **report** tab and press **generate current
-   report** once, so a finished report exists as the fallback for beat 5.
-3. Close the dev window.
+2. Same window, **report** tab → **generate current report** once, so a
+   finished report exists as the fallback for beat 5.
+3. Back to the **ping** tab before you roll.
+
+If you previewed a scene while tuning, the caption badge reads
+**preview · this window only · back to live** — click it. A previewing window
+ignores the live weather, which would kill beat 2.
 
 (Terminal equivalent, if you must: `OUTPUTS=<path to the main branch's
 amplify_outputs.json> DEV_EMAIL=dev@undercurrent.local DEV_PASSWORD=…
