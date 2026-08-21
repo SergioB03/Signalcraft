@@ -62,6 +62,12 @@ coconut mode) and a **spot** on the river (drifting, the headwater, the rapids,
 on the big rock, in the shade, the shallows, the eddy). Both are self-chosen
 and never inferred from mood data; both sync live to every open window.
 
+**Visiting?** Sign up with any email and you land in **simulation mode**: six
+made-up teammates have already pinged, you're the seventh, and your stone
+decides the weather — nothing you do reaches a real team. The header toggle
+switches to the live demo team; *reset the simulation* re-rolls your
+teammates.
+
 Tabs live in the URL hash (`#team`, `#report`, `#dev`), so refresh, back, and
 deep links behave with no router.
 

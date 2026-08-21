@@ -15,6 +15,8 @@ Each member has an avatar with a pose they choose (floating, on a raft, underwat
 
 Leads also get a team tab (roster and participation count, never who pinged) and a report tab: one button produces a 3–4 sentence read of the week plus one suggested action, written by Claude Haiku 4.5 on Amazon Bedrock from aggregates only. Everything syncs to every open window over AppSync subscriptions.
 
+Because most visitors will be community members rather than a real team, a new sign-up lands in **simulation mode**: six made-up teammates have already pinged, you are the seventh, and your stone decides the weather. Nothing in the simulation reaches the live team; a header toggle switches over, and a "preview build" pill always says which mode you are in.
+
 ## Architecture
 
 ```mermaid

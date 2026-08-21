@@ -390,6 +390,25 @@ Two offset-curve lessons, both found by screenshots at several widths:
 - The article draft was written in parallel by a subagent from this file
   while the last visual pass ran — the deadline stayed safe either way.
 
+### Simulation mode (Fri ~1:30 PM): a sandbox for the people who'll actually visit
+
+Most visitors will be AWS community members, not a real team. Giving them the
+dev reset would let strangers wipe the demo river; giving them nothing would
+mean a static page. So: a **simulation** toggle, remembered per browser, on
+by default for real sign-ups and off for the cast, leads, and dev.
+
+- Six made-up teammates (rae, milo, sol, ivy, noor, beck) with random moods,
+  poses, and spots; the visitor is the seventh and last to ping. The river
+  opens at "gathering — 6 of 7 have pinged, your ping decides the weather";
+  their stone runs the seven scores through the same thresholds as the
+  Lambda (`sceneFor`, mirrored for the sandbox only — real weather is still
+  never computed in a browser) and the sky tweens to the answer. Reset
+  re-rolls the six; "ping again" keeps them.
+- Nothing touches the real team. Pose and spot still write to the visitor's
+  own membership, so they keep their place on the live river.
+- A persistent "preview build" pill says which mode you're in.
+- Login stays: tinkerers need an identity for the live mode and their spot.
+
 ### Color and character (Fri ~4:30 AM): the people stop being stick figures
 
 The developer's last note: still too plain, characters too basic, more color.
