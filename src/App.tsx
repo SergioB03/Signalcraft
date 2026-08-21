@@ -5,6 +5,7 @@ import {
   fetchAuthSession,
   fetchUserAttributes,
   getCurrentUser,
+  resendSignUpCode,
   resetPassword,
   signIn,
   signOut,
@@ -126,6 +127,18 @@ export default function App() {
       .catch(() => setStage('signIn'))
   }, [])
 
+  // Tokens are shared per browser: if another tab signs in or out, THIS tab's
+  // session silently changes under it — a sign-in form would dead-end, and a
+  // river would act as the wrong person. Reload on any cross-tab auth change
+  // so every tab always reflects who the tokens say it is.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key?.includes('LastAuthUser') && e.newValue !== e.oldValue) window.location.reload()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
   if (stage === 'loading')
     return (
       <main className="shell centered">
@@ -184,6 +197,12 @@ function AuthGate({
     try {
       await fn()
     } catch (e) {
+      // Another tab already signed this browser in: the tokens are valid, so
+      // just go in rather than parroting Amplify's "already a signed in user".
+      if ((e as { name?: string }).name === 'UserAlreadyAuthenticatedException') {
+        setStage('in')
+        return
+      }
       setError(e instanceof Error ? e.message : 'Something went wrong — try again.')
     } finally {
       setBusy(false)
@@ -319,6 +338,20 @@ function AuthGate({
                 </button>
               </>
             )}
+            {stage === 'confirm' && (
+              <button
+                className="link"
+                disabled={busy}
+                onClick={() =>
+                  run(async () => {
+                    await resendSignUpCode({ username: email })
+                    setNotice('a fresh code is on its way — check spam too.')
+                  })
+                }
+              >
+                send a new code
+              </button>
+            )}
             {stage !== 'signIn' && (
               <button className="link" onClick={() => go('signIn')}>
                 back to sign in
@@ -358,18 +391,6 @@ function Home({
   // Dev-only local override of the scene (never written anywhere): lets the
   // presenter show "storm" on cue, and lets us tune every scene by eye.
   const [preview, setPreview] = useState<SceneName | null>(null)
-
-  // Tokens are shared per browser: if another tab signs in as a different
-  // account, THIS tab's session silently becomes that account while its state
-  // still says "you are X" — poses and pings would land on the wrong person.
-  // Reload on any cross-tab auth change so "you" is always who the tokens say.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key?.includes('LastAuthUser') && e.newValue !== e.oldValue) window.location.reload()
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
 
   // Make sure the demo team + my membership exist. Deterministic membership
   // id (`teamId#userId`) means StrictMode's double-run can't create dupes —
@@ -430,6 +451,14 @@ function Home({
     })
     return () => sub.unsubscribe()
   }, [])
+
+  // If a lead takes you off the river, stop acting on the ghost id.
+  useEffect(() => {
+    if (myMembershipId && members.length > 0 && !members.some((m) => m.id === myMembershipId)) {
+      setMyMembershipId(null)
+      setPoseError('you were taken off the river — reload to rejoin.')
+    }
+  }, [members, myMembershipId])
 
   const scene = (weather?.scene ?? null) as SceneName | null
   const shownScene = preview ?? scene
@@ -848,7 +877,7 @@ function DevPanel({
     {
       scope: 'reseed',
       label: 'wipe and reseed',
-      detail: 'wipe, then drop a fresh day of seven demo pings — past the anonymity floor, ready to present.',
+      detail: 'wipe pings and receipts, then drop a fresh day of five demo pings — past the anonymity floor, ready to present. reports are kept.',
       destructive: true,
     },
   ]
@@ -1006,6 +1035,17 @@ function PingForm() {
             ? 'your ping is in the river. see you tomorrow.'
             : "you've already pinged today — the river remembers."}
         </p>
+        {status === 'already' && (
+          <button
+            className="link subtle"
+            onClick={() => {
+              receiptHeld.current = false
+              setStatus('idle')
+            }}
+          >
+            think that's wrong? try again
+          </button>
+        )}
       </section>
     )
 
