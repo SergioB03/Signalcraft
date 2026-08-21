@@ -98,6 +98,28 @@ privilege. Anonymity never depended on this (Ping stores no userId), but unused
 permissions are the kind that bite later. Revisit if the Tier-3 history sparkline
 ever needs client-side ping reads.
 
+### Session 2 (started same night, hours ahead): the river renders
+
+- Canvas river: six scenes driven by one severity scalar (0–1) — wave amplitude,
+  water speed, cloud cover, rain, lightning, and avatar bobbing all read the same
+  number, so the scene feels connected instead of six unrelated animations. Scene
+  changes tween over 2s from wherever the current tween is (never snap, never
+  restart). Reduced motion: still frames with a crossfade, no rain or lightning.
+- Avatars: fixed slots ordered by membership creation; six poses drawn as canvas
+  primitives (no assets). Membership auto-created on first sign-in with a
+  deterministic id (`teamId#userId`) — the same conditional-create trick as
+  receipts, this time defusing React StrictMode's double-effect race.
+- Theme toggle: CSS custom properties as *roles* (--silt is "ground", --foam is
+  "text"); light theme is one data-theme attribute flip. Canvas colors stay
+  absolute — a storm is dark in either theme; the chrome themes around the river.
+- Verified with headless Edge (Playwright, --no-save): screenshots of both themes,
+  and the two-window pose-sync proof — demo1 switched to coconut mode in window A,
+  window B rendered it via the Membership subscription. Weather + poses both
+  proven live end-to-end.
+- Watch item: an occasional stray HTTP 400 in the console during first sign-in
+  (membership-creation race absorbed by the conditional create; benign but worth
+  a look before submission).
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root

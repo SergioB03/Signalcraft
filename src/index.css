@@ -1,12 +1,24 @@
-/* riverbed palette — see CLAUDE.md §7. Theme toggle lands in Session 2;
-   tokens live on :root now so the canvas can read the same variables. */
-:root {
+/* riverbed palette — see CLAUDE.md §7. Tokens are roles, not colors:
+   --silt is "the ground", --foam is "the text" — so the light theme is one
+   attribute flip that reassigns values, and every component just works. */
+:root,
+:root[data-theme='dark'] {
   --silt: #1b2027;
   --stone: #2e3944;
   --reed: #5e7c6b;
   --sun: #e8c87e;
   --foam: #e6edf2;
   --clay: #a2603f;
+  --on-accent: #1b2027;
+}
+
+/* pale overcast sky; same accents */
+:root[data-theme='light'] {
+  --silt: #edf1f3;
+  --stone: #dce3e8;
+  --foam: #1b2027;
+  --clay: #8a4d2e;
+  --on-accent: #edf1f3;
 }
 
 * {
@@ -19,6 +31,7 @@ body {
   color: var(--foam);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   line-height: 1.5;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 button {
@@ -33,4 +46,10 @@ input {
 :focus-visible {
   outline: 2px solid var(--sun);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
 }

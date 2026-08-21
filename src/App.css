@@ -1,17 +1,19 @@
-/* Session-1 scaffolding styles: functional, keyboard-friendly, plain.
-   The real riverbank design pass is Session 2. */
-
 .shell {
-  max-width: 40rem;
+  max-width: 46rem;
   margin: 0 auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: 1.25rem 1rem 3rem;
 }
 
 header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 2rem;
+  margin-bottom: 1.25rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
 .brand {
@@ -23,27 +25,97 @@ header {
   color: var(--reed);
 }
 
+/* --- the river ---------------------------------------------------------- */
+
 .water {
+  position: relative;
+  border-radius: 0.9rem;
+  overflow: hidden;
+  margin-bottom: 1.75rem;
   background: var(--stone);
-  border-radius: 0.75rem;
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  margin-bottom: 2rem;
+}
+
+.river-wrap {
+  position: relative;
+  display: block;
+}
+
+.river-wrap canvas {
+  display: block;
+  width: 100%;
+}
+
+.river-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* the page's thesis: the scene named plainly over the water */
+.scene-label {
+  position: absolute;
+  left: 1.25rem;
+  bottom: 0.9rem;
+  right: 1.25rem;
+  color: #e6edf2;
+  text-shadow: 0 1px 8px rgba(10, 14, 18, 0.55);
+  pointer-events: none;
 }
 
 .scene-name {
-  font-size: 3rem;
+  font-size: clamp(2.2rem, 7vw, 3.4rem);
   font-weight: 700;
   text-transform: lowercase;
-  margin: 0 0 0.5rem;
+  letter-spacing: 0.01em;
+  margin: 0;
+  line-height: 1.05;
 }
+
+.scene-caption {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  opacity: 0.92;
+}
+
+/* --- poses --------------------------------------------------------------- */
+
+.poses h2,
+.ping h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.6rem;
+}
+
+.pose-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+}
+
+.pose {
+  background: var(--stone);
+  color: var(--foam);
+  border: none;
+  border-radius: 2rem;
+  padding: 0.45rem 0.9rem;
+}
+
+.pose.selected {
+  background: var(--reed);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+/* --- forms --------------------------------------------------------------- */
 
 .auth form,
 .ping {
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
-  max-width: 22rem;
+  max-width: 24rem;
 }
 
 label {
@@ -65,7 +137,7 @@ button {
   border-radius: 0.4rem;
   border: none;
   background: var(--reed);
-  color: var(--silt);
+  color: var(--on-accent);
   font-weight: 600;
 }
 
@@ -106,7 +178,7 @@ button.link {
 
 .mood.selected {
   background: var(--reed);
-  color: var(--silt);
+  color: var(--on-accent);
 }
 
 .error {

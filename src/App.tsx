@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   confirmSignUp,
+  fetchUserAttributes,
   getCurrentUser,
   signIn,
   signOut,
@@ -8,6 +9,9 @@ import {
 } from 'aws-amplify/auth'
 import { generateClient } from 'aws-amplify/data'
 import type { Schema } from '../amplify/data/resource'
+import RiverCanvas from './river/RiverCanvas'
+import { SCENES } from './river/scenes'
+import type { AvatarPose, RiverMember, SceneName } from './river/scenes'
 import './App.css'
 
 const client = generateClient<Schema>()
@@ -16,7 +20,38 @@ const client = generateClient<Schema>()
 const TEAM_ID = 'demo-team'
 
 type WeatherRow = Schema['WeatherState']['type']
+type MembershipRow = Schema['Membership']['type']
 type Stage = 'loading' | 'signIn' | 'signUp' | 'confirm' | 'in'
+
+const POSES: Array<{ pose: AvatarPose; label: string }> = [
+  { pose: 'floating', label: 'floating' },
+  { pose: 'waving', label: 'waving' },
+  { pose: 'raft', label: 'on a raft' },
+  { pose: 'underwater', label: 'underwater' },
+  { pose: 'struck', label: 'struck' },
+  { pose: 'coconut', label: 'coconut mode' },
+]
+
+function useTheme() {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      const saved = localStorage.getItem('uc-theme')
+      if (saved === 'light' || saved === 'dark') return saved
+    } catch {
+      /* private mode etc. — fall through to system preference */
+    }
+    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  })
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      localStorage.setItem('uc-theme', theme)
+    } catch {
+      /* fine — the toggle still works for this visit */
+    }
+  }, [theme])
+  return { theme, toggle: () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')) }
+}
 
 export default function App() {
   const [stage, setStage] = useState<Stage>('loading')
@@ -132,15 +167,47 @@ function AuthGate({
 }
 
 function River({ onSignOut }: { onSignOut: () => void }) {
+  const { theme, toggle } = useTheme()
   const [weather, setWeather] = useState<WeatherRow | null>(null)
+  const [members, setMembers] = useState<MembershipRow[]>([])
+  const [myUserId, setMyUserId] = useState<string | null>(null)
+  const [myMembershipId, setMyMembershipId] = useState<string | null>(null)
 
-  // Make sure the demo team row exists; a conflict just means it already does.
+  // Make sure the demo team + my membership exist. Deterministic membership
+  // id (`teamId#userId`) means StrictMode's double-run can't create dupes —
+  // the second create loses the conditional write, same trick as receipts.
   useEffect(() => {
-    client.models.Team.create({ id: TEAM_ID, name: 'Demo Team' }).catch(() => {})
+    let cancelled = false
+    ;(async () => {
+      await client.models.Team.create({ id: TEAM_ID, name: 'Demo Team' }).catch(() => {})
+      const { userId } = await getCurrentUser()
+      const membershipId = `${TEAM_ID}#${userId}`
+      let mine = (await client.models.Membership.get({ id: membershipId })).data
+      if (!mine) {
+        const attrs = await fetchUserAttributes().catch(() => ({ email: undefined }))
+        const displayName = (attrs.email ?? 'someone').split('@')[0]
+        const created = await client.models.Membership.create({
+          id: membershipId,
+          teamId: TEAM_ID,
+          userId,
+          role: 'member',
+          displayName,
+          avatarPose: 'floating',
+        })
+        mine = created.data ?? (await client.models.Membership.get({ id: membershipId })).data
+      }
+      if (!cancelled) {
+        setMyUserId(userId)
+        setMyMembershipId(mine?.id ?? null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  // The heart of the app: subscribe to WeatherState. The weather Lambda's
-  // AppSync mutation lands here live — clients never compute weather locally.
+  // Live weather: the heart of the app. The Lambda's AppSync mutation lands
+  // here — clients never compute weather locally.
   useEffect(() => {
     const sub = client.models.WeatherState.observeQuery().subscribe({
       next: ({ items }) => {
@@ -151,35 +218,89 @@ function River({ onSignOut }: { onSignOut: () => void }) {
     return () => sub.unsubscribe()
   }, [])
 
-  const scene = weather?.scene ?? null
+  // Live teammates: pose changes broadcast to every open window.
+  useEffect(() => {
+    const sub = client.models.Membership.observeQuery({
+      filter: { teamId: { eq: TEAM_ID } },
+    }).subscribe({
+      next: ({ items }) =>
+        setMembers(
+          [...items].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? '')),
+        ),
+    })
+    return () => sub.unsubscribe()
+  }, [])
+
+  const scene = (weather?.scene ?? null) as SceneName | null
+  const myPose = members.find((m) => m.id === myMembershipId)?.avatarPose ?? 'floating'
+
+  const riverMembers: RiverMember[] = members.map((m) => ({
+    id: m.id,
+    displayName: m.displayName,
+    pose: (m.avatarPose ?? 'floating') as AvatarPose,
+    isMe: m.userId === myUserId,
+  }))
+
+  const setPose = (pose: AvatarPose) => {
+    if (!myMembershipId) return
+    client.models.Membership.update({ id: myMembershipId, avatarPose: pose })
+  }
 
   return (
     <main className="shell">
       <header>
         <span className="brand">undercurrent</span>
-        <button
-          className="link"
-          onClick={() => signOut().then(onSignOut)}
-        >
-          sign out
-        </button>
+        <span className="header-actions">
+          <button
+            className="link"
+            onClick={toggle}
+            aria-label={`switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            {theme === 'dark' ? 'daylight' : 'dusk'}
+          </button>
+          <button className="link" onClick={() => signOut().then(onSignOut)}>
+            sign out
+          </button>
+        </span>
       </header>
 
-      <section className="water" data-scene={scene ?? 'empty'}>
-        <h1 className="scene-name">{scene ?? 'still water'}</h1>
-        {scene === null && <p>nobody's pinged yet today — set the tone.</p>}
-        {scene === 'gathering' && (
-          <p>
-            waiting on a few more before the water shows — pings stay anonymous.
-            {typeof weather?.pingCount === 'number' && ` (${weather.pingCount} of 5 so far)`}
+      <section className="water" aria-label={`team weather: ${scene ?? 'no pings yet'}`}>
+        <RiverCanvas scene={scene} members={riverMembers} />
+        <div className="scene-label">
+          <h1 className="scene-name">{scene ?? 'still water'}</h1>
+          <p className="scene-caption">
+            {scene === null && "nobody's pinged yet today — set the tone."}
+            {scene === 'gathering' &&
+              `waiting on a few more before the water shows — pings stay anonymous. (${
+                weather?.pingCount ?? 0
+              } of 5 so far)`}
+            {scene !== null && scene !== 'gathering' && (
+              <>
+                {SCENES[scene].caption} — {weather?.pingCount} ping
+                {weather?.pingCount === 1 ? '' : 's'} today
+                {typeof weather?.score === 'number' && `, average ${weather.score.toFixed(1)}`}
+              </>
+            )}
           </p>
-        )}
-        {scene !== null && scene !== 'gathering' && (
-          <p>
-            {weather?.pingCount} ping{weather?.pingCount === 1 ? '' : 's'} in the last day
-            {typeof weather?.score === 'number' && ` — average ${weather.score.toFixed(1)}`}
-          </p>
-        )}
+        </div>
+      </section>
+
+      <section className="poses" aria-label="your avatar pose">
+        <h2>you, on the river</h2>
+        <div className="pose-row" role="radiogroup" aria-label="choose your pose">
+          {POSES.map((p) => (
+            <button
+              key={p.pose}
+              role="radio"
+              aria-checked={myPose === p.pose}
+              className={myPose === p.pose ? 'pose selected' : 'pose'}
+              disabled={!myMembershipId}
+              onClick={() => setPose(p.pose)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </section>
 
       <PingForm />
