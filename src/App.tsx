@@ -1,18 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
+  confirmResetPassword,
   confirmSignUp,
   fetchAuthSession,
   fetchUserAttributes,
   getCurrentUser,
+  resetPassword,
   signIn,
   signOut,
   signUp,
 } from 'aws-amplify/auth'
 import { generateClient } from 'aws-amplify/data'
+import gsap from 'gsap'
 import type { Schema } from '../amplify/data/resource'
 import RiverCanvas from './river/RiverCanvas'
-import { SCENES } from './river/scenes'
+import { SCENES, SCENE_ORDER } from './river/scenes'
 import type { AvatarPose, RiverMember, SceneName } from './river/scenes'
+import BlurText from './ui/BlurText'
+import LoginHorizon from './ui/LoginHorizon'
+import SceneTitle from './ui/SceneTitle'
 import './App.css'
 
 const client = generateClient<Schema>()
@@ -24,7 +30,7 @@ const ANONYMITY_FLOOR = 5
 
 type WeatherRow = Schema['WeatherState']['type']
 type MembershipRow = Schema['Membership']['type']
-type Stage = 'loading' | 'signIn' | 'signUp' | 'confirm' | 'in'
+type Stage = 'loading' | 'signIn' | 'signUp' | 'confirm' | 'forgot' | 'resetConfirm' | 'in'
 type View = 'river' | 'team' | 'report' | 'dev'
 
 const POSES: Array<{ pose: AvatarPose; label: string }> = [
@@ -149,7 +155,28 @@ function AuthGate({
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const cardRef = useRef<HTMLElement>(null)
+
+  // GSAP entrance: the card settles in, then its contents follow.
+  useLayoutEffect(() => {
+    const card = cardRef.current
+    if (!card) return
+    const mm = gsap.matchMedia(card)
+    mm.add('(prefers-reduced-motion: no-preference)', () => {
+      gsap.from(card, { y: 26, autoAlpha: 0, duration: 0.8, ease: 'power3.out' })
+      gsap.from('.auth-body > *', {
+        y: 10,
+        autoAlpha: 0,
+        stagger: 0.07,
+        duration: 0.5,
+        delay: 0.25,
+        ease: 'power2.out',
+      })
+    })
+    return () => mm.revert()
+  }, [])
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true)
@@ -178,63 +205,77 @@ function AuthGate({
     }
   }
 
+  const go = (next: Stage, message = '') => {
+    setStage(next)
+    setError('')
+    setNotice(message)
+    setCode('')
+  }
+
   const submit = () =>
     run(async () => {
+      setNotice('')
       if (stage === 'signUp') {
         await signUp({ username: email, password, options: { userAttributes: { email } } })
-        setStage('confirm')
+        go('confirm', 'we emailed you a confirmation code.')
       } else if (stage === 'confirm') {
         await confirmSignUp({ username: email, confirmationCode: code })
+        await finishSignIn()
+      } else if (stage === 'forgot') {
+        await resetPassword({ username: email })
+        setPassword('')
+        go('resetConfirm', 'we emailed you a reset code — pick a new password below.')
+      } else if (stage === 'resetConfirm') {
+        await confirmResetPassword({ username: email, confirmationCode: code, newPassword: password })
         await finishSignIn()
       } else {
         await finishSignIn()
       }
     })
 
+  const showEmail = stage === 'signIn' || stage === 'signUp' || stage === 'forgot'
+  const showPassword = stage === 'signIn' || stage === 'signUp' || stage === 'resetConfirm'
+  const showCode = stage === 'confirm' || stage === 'resetConfirm'
+  const buttonLabel = busy
+    ? 'one moment…'
+    : stage === 'signUp'
+      ? 'create account'
+      : stage === 'confirm'
+        ? 'confirm and sign in'
+        : stage === 'forgot'
+          ? 'email me a reset code'
+          : stage === 'resetConfirm'
+            ? 'set new password and sign in'
+            : 'sign in'
+
   return (
     <main className="shell centered">
-      <section className="auth-card">
-        <div className="horizon" aria-hidden="true" />
+      <section className="auth-card" ref={cardRef}>
+        <LoginHorizon />
         <div className="auth-body">
           <h1 className="brand-large">undercurrent</h1>
-          <p className="tagline">how's the water today?</p>
+          <BlurText className="tagline" text="how's the water today?" delay={0.4} />
           <form
             onSubmit={(e) => {
               e.preventDefault()
               submit()
             }}
           >
-            {stage !== 'confirm' && (
-              <>
-                <label>
-                  email
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    required
-                  />
-                </label>
-                <label>
-                  password
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete={stage === 'signUp' ? 'new-password' : 'current-password'}
-                    minLength={8}
-                    required
-                  />
-                </label>
-                {stage === 'signUp' && (
-                  <p className="hint">8+ characters with upper, lower, number, and symbol.</p>
-                )}
-              </>
-            )}
-            {stage === 'confirm' && (
+            {showEmail && (
               <label>
-                confirmation code — check your email
+                email
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  required
+                />
+              </label>
+            )}
+            {showCode && (
+              <label>
+                {stage === 'confirm' ? 'confirmation code — check your email' : 'reset code — check your email'}
                 <input
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
@@ -244,25 +285,42 @@ function AuthGate({
                 />
               </label>
             )}
+            {showPassword && (
+              <label>
+                {stage === 'resetConfirm' ? 'new password' : 'password'}
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={stage === 'signIn' ? 'current-password' : 'new-password'}
+                  minLength={8}
+                  required
+                />
+              </label>
+            )}
+            {(stage === 'signUp' || stage === 'resetConfirm') && (
+              <p className="hint">8+ characters with upper, lower, number, and symbol.</p>
+            )}
+            {stage === 'forgot' && <p className="hint">we'll email a one-time code to that address.</p>}
+            {notice && <p className="notice">{notice}</p>}
             {error && <p className="error">{error}</p>}
             <button type="submit" className="primary" disabled={busy}>
-              {busy
-                ? 'one moment…'
-                : stage === 'signUp'
-                  ? 'create account'
-                  : stage === 'confirm'
-                    ? 'confirm and sign in'
-                    : 'sign in'}
+              {buttonLabel}
             </button>
           </form>
           <div className="auth-links">
             {stage === 'signIn' && (
-              <button className="link" onClick={() => setStage('signUp')}>
-                new here? create an account
-              </button>
+              <>
+                <button className="link" onClick={() => go('signUp')}>
+                  new here? create an account
+                </button>
+                <button className="link" onClick={() => go('forgot')}>
+                  forgot your password?
+                </button>
+              </>
             )}
             {stage !== 'signIn' && (
-              <button className="link" onClick={() => setStage('signIn')}>
+              <button className="link" onClick={() => go('signIn')}>
                 back to sign in
               </button>
             )}
@@ -297,6 +355,9 @@ function Home({
   const [myUserId, setMyUserId] = useState<string | null>(null)
   const [myMembershipId, setMyMembershipId] = useState<string | null>(null)
   const [poseError, setPoseError] = useState('')
+  // Dev-only local override of the scene (never written anywhere): lets the
+  // presenter show "storm" on cue, and lets us tune every scene by eye.
+  const [preview, setPreview] = useState<SceneName | null>(null)
 
   // Tokens are shared per browser: if another tab signs in as a different
   // account, THIS tab's session silently becomes that account while its state
@@ -371,6 +432,7 @@ function Home({
   }, [])
 
   const scene = (weather?.scene ?? null) as SceneName | null
+  const shownScene = preview ?? scene
   const myPose = members.find((m) => m.id === myMembershipId)?.avatarPose ?? 'floating'
   const riverMembers: RiverMember[] = members.map((m) => ({
     id: m.id,
@@ -429,15 +491,22 @@ function Home({
         </span>
       </header>
 
-      <section className="water" aria-label={`team weather: ${scene ?? 'no pings yet'}`}>
-        <RiverCanvas scene={scene} members={riverMembers} />
+      <section className="water" aria-label={`team weather: ${shownScene ?? 'no pings yet'}`}>
+        <RiverCanvas scene={shownScene} members={riverMembers} />
         <div className="scene-label">
-          <h1 className="scene-name">{scene ?? 'still water'}</h1>
+          <SceneTitle className="scene-name" text={shownScene ?? 'still water'} />
           <p className="scene-caption">
-            {scene === null && "nobody's pinged yet today — set the tone."}
-            {scene === 'gathering' &&
+            {preview && (
+              <>
+                <span className="preview-pill">preview · this window only</span>
+                {SCENES[preview].caption}.
+              </>
+            )}
+            {!preview && scene === null && "nobody's pinged yet today — set the tone."}
+            {!preview &&
+              scene === 'gathering' &&
               `waiting on a few more before the water shows — pings stay anonymous. (${pingCount} of ${ANONYMITY_FLOOR} so far)`}
-            {scene !== null && scene !== 'gathering' && (
+            {!preview && scene !== null && scene !== 'gathering' && (
               <>
                 {SCENES[scene].caption} — {pingCount} ping{pingCount === 1 ? '' : 's'} today
                 {typeof weather?.score === 'number' && `, average ${weather.score.toFixed(1)}`}
@@ -484,7 +553,7 @@ function Home({
         />
       )}
       {view === 'report' && isLead && <ReportPanel />}
-      {view === 'dev' && isDev && <DevPanel />}
+      {view === 'dev' && isDev && <DevPanel preview={preview} onPreview={setPreview} />}
     </main>
   )
 }
@@ -709,7 +778,13 @@ function ReportPanel() {
 // ---------------------------------------------------------------------------
 // dev (test environment)
 
-function DevPanel() {
+function DevPanel({
+  preview,
+  onPreview,
+}: {
+  preview: SceneName | null
+  onPreview: (s: SceneName | null) => void
+}) {
   const [busy, setBusy] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
   const [result, setResult] = useState('')
@@ -754,6 +829,33 @@ function DevPanel() {
       <div className="card-head">
         <h2>test environment</h2>
         <span className="muted">dev only · acts on the demo team</span>
+      </div>
+      <div className="dev-preview">
+        <strong>preview the weather</strong>
+        <p className="muted small">
+          this window only — the team's real weather is untouched. handy for the video.
+        </p>
+        <div className="pose-row" role="radiogroup" aria-label="preview scene">
+          <button
+            role="radio"
+            aria-checked={preview === null}
+            className={preview === null ? 'pose selected' : 'pose'}
+            onClick={() => onPreview(null)}
+          >
+            live
+          </button>
+          {SCENE_ORDER.map((s) => (
+            <button
+              key={s}
+              role="radio"
+              aria-checked={preview === s}
+              className={preview === s ? 'pose selected' : 'pose'}
+              onClick={() => onPreview(s)}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
       <ul className="dev-actions">
         {actions.map((a) => (

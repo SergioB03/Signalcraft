@@ -1,11 +1,11 @@
 /**
  * Scene definitions for the river canvas.
  *
- * Everything visual derives from `severity` (0–1): wave amplitude, water
- * speed, cloud cover, rain, and avatar bobbing all read the same scalar,
- * which is what makes the scene feel like one connected system. Colors are
- * absolute (a storm is dark in either UI theme); the page chrome themes
- * around the river, not the river itself.
+ * Everything visual derives from `severity` (0–1): flow speed, chop, cloud
+ * cover, rain, lightning, how far the greens drain out of the banks, and how
+ * hard the avatars bob. One scalar, one connected landscape. Colors are
+ * absolute (a storm is dark in either UI theme); the page chrome themes around
+ * the river, not the river itself.
  */
 
 export type SceneName =
@@ -22,6 +22,9 @@ export type SceneSpec = {
   skyBottom: string
   water: string
   waterDeep: string
+  bank: string // grass / ground on either side of the stream
+  foliage: string // reeds, canopies
+  hill: string // distant hills at the horizon
   sun: number // 0-1 how present the sun is
   clouds: number // 0-1 cloud cover
   rain: number // 0-1 rain density
@@ -29,13 +32,25 @@ export type SceneSpec = {
   caption: string
 }
 
+export const SCENE_ORDER: SceneName[] = [
+  'gathering',
+  'clear',
+  'breezy',
+  'overcast',
+  'rough',
+  'storm',
+]
+
 export const SCENES: Record<SceneName, SceneSpec> = {
   gathering: {
     severity: 0.15,
     skyTop: '#8d9aa6',
-    skyBottom: '#c2cad1',
-    water: '#6a7b85',
-    waterDeep: '#4a5a64',
+    skyBottom: '#c8cfd4',
+    water: '#6f8089',
+    waterDeep: '#4c5b64',
+    bank: '#73816f',
+    foliage: '#5f7266',
+    hill: '#7e8b86',
     sun: 0,
     clouds: 0.35,
     rain: 0,
@@ -44,22 +59,28 @@ export const SCENES: Record<SceneName, SceneSpec> = {
   },
   clear: {
     severity: 0.06,
-    skyTop: '#6fa8d0',
-    skyBottom: '#d8ecf6',
-    water: '#4e86a0',
-    waterDeep: '#35637a',
+    skyTop: '#6ea9d2',
+    skyBottom: '#dcedf5',
+    water: '#4f8aa3',
+    waterDeep: '#2f5f78',
+    bank: '#7e9d6b',
+    foliage: '#5e7c6b',
+    hill: '#6f9282',
     sun: 1,
-    clouds: 0.05,
+    clouds: 0.08,
     rain: 0,
     lightning: false,
     caption: 'glassy and slow',
   },
   breezy: {
     severity: 0.3,
-    skyTop: '#79a8c4',
-    skyBottom: '#cfe2ec',
-    water: '#4b8390',
-    waterDeep: '#326070',
+    skyTop: '#78a6c3',
+    skyBottom: '#d2e3ec',
+    water: '#4b8694',
+    waterDeep: '#2c5e6d',
+    bank: '#78956a',
+    foliage: '#587566',
+    hill: '#6a8a7c',
     sun: 0.7,
     clouds: 0.3,
     rain: 0,
@@ -69,9 +90,12 @@ export const SCENES: Record<SceneName, SceneSpec> = {
   overcast: {
     severity: 0.55,
     skyTop: '#67727c',
-    skyBottom: '#9aa3ab',
-    water: '#49565e',
-    waterDeep: '#333e46',
+    skyBottom: '#a0a8ae',
+    water: '#4a5962',
+    waterDeep: '#2f3a42',
+    bank: '#68766a',
+    foliage: '#4f6157',
+    hill: '#5f6c6a',
     sun: 0,
     clouds: 0.75,
     rain: 0.15,
@@ -80,10 +104,13 @@ export const SCENES: Record<SceneName, SceneSpec> = {
   },
   rough: {
     severity: 0.8,
-    skyTop: '#3c4550',
-    skyBottom: '#5c6670',
-    water: '#2e3a44',
-    waterDeep: '#1e262e',
+    skyTop: '#3b444e',
+    skyBottom: '#5e6870',
+    water: '#2c3943',
+    waterDeep: '#18212a',
+    bank: '#4a554c',
+    foliage: '#36443c',
+    hill: '#414c4d',
     sun: 0,
     clouds: 0.9,
     rain: 0.55,
@@ -92,10 +119,13 @@ export const SCENES: Record<SceneName, SceneSpec> = {
   },
   storm: {
     severity: 1,
-    skyTop: '#171c22',
-    skyBottom: '#2c343d',
-    water: '#141a20',
-    waterDeep: '#0b0f13',
+    skyTop: '#151a20',
+    skyBottom: '#2b333c',
+    water: '#131920',
+    waterDeep: '#090d11',
+    bank: '#2c332f',
+    foliage: '#1f2824',
+    hill: '#262e35',
     sun: 0,
     clouds: 1,
     rain: 1,
