@@ -258,6 +258,40 @@ email path proven) and reported: the dev page felt laggy, no dev access, and
   sign-ups were stuck floating as their email prefix.
 - Mobile pass: tabs were stacking vertically in the header; now a second row.
 
+### The river, second draft (Fri ~2–3 AM): a stream going downhill
+
+The developer didn't like the first river — a flat horizon with water below
+read as "ocean", not "place". The brief: a stream running downhill with greens
+on the outskirts, an indie-game feel, degrading into clouds, then rapids, storm
+clouds, rain, lightning. Built on a branch so main stayed deployable.
+
+- **Perspective from two functions of y.** `centerX(y)` is a gentle S-curve;
+  `halfWidth(y)` goes from a sliver at the horizon to a third of the canvas
+  at the bank. Every land feature — 260 grass strokes, 30 reeds, 12 trees,
+  6 rocks, 70 flow streaks — is laid out once in unit space with a
+  deterministic pseudo-random (same scenery every visit) and projected
+  through those two functions, so the scene survives resizes.
+- **Severity now drains the landscape, not just the sky.** Scenes gained
+  bank/foliage/hill colors, all tweened through the same 2s palette mix; the
+  greens go grey-green by "overcast" and near-black by "storm". Flow speed,
+  chop on the bank edges, whitecaps, foam at the rocks, wind lean on reeds
+  and grass, cloud mass, rain, lightning — one scalar.
+- Avatars sit in fixed slots down the stream, scaled by distance; far ones
+  draw first.
+- **Dev-only weather preview**: a local override that never touches data, so
+  every scene can be tuned by eye and shown on cue in the video.
+- **GSAP + React Bits**: React Bits components are copied into the repo by
+  design, so `src/ui/SceneTitle.tsx` (after SplitText) and `BlurText.tsx`
+  are ours to read and change; `LoginHorizon.tsx` is a GSAP-animated SVG
+  river for the login card; the card itself settles in with a timeline. All
+  of it sits out under prefers-reduced-motion via `gsap.matchMedia`.
+- **Forgot-password flow**, prompted by the developer locking himself out:
+  Cognito's `resetPassword` → emailed code → `confirmResetPassword` → sign
+  in, as two more stages of the same auth card. A good problem to have had
+  before judges did.
+- Review note to self: foam rings around rocks read as eyeballs. Bow-wave
+  plus wake streaks instead.
+
 ### Decision: scaffold = Vite template + `create-amplify` on top
 
 `npm create vite@latest` (react-ts template) into a temp dir merged into the repo root
