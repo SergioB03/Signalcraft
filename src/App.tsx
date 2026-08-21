@@ -15,7 +15,7 @@ import { generateClient } from 'aws-amplify/data'
 import gsap from 'gsap'
 import type { Schema } from '../amplify/data/resource'
 import RiverCanvas from './river/RiverCanvas'
-import { SCENES, SCENE_ORDER, SPOTS } from './river/scenes'
+import { SCENES, SCENE_ORDER, SPOTS, memberColor } from './river/scenes'
 import type { AvatarPose, RiverMember, SceneName, Spot } from './river/scenes'
 import BlurText from './ui/BlurText'
 import LoginHorizon from './ui/LoginHorizon'
@@ -729,6 +729,7 @@ function TeamPanel({
           return (
             <li key={m.id} className="roster-row">
               <span className="roster-name">
+                <span className="dot" style={{ background: memberColor(m.id) }} aria-hidden="true" />
                 {m.displayName}
                 {isMe && <span className="you-tag">you</span>}
                 {m.role === 'lead' && <span className="role-tag">lead</span>}

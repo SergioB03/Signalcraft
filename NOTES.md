@@ -318,6 +318,28 @@ the land. Final visual round before the freeze:
   the lower left, so they rarely fight; on phones the stream ends higher and
   the two downstream spots move upstream so the caption band stays clear.
 
+### Color and character (Fri ~4:30 AM): the people stop being stick figures
+
+The developer's last note: still too plain, characters too basic, more color.
+Held to the riverbed palette, added within it:
+
+- **Each person gets a stable personal color** hashed from their membership
+  id (sun, coral, sky, moss, lavender, rose, sand, mint) — shirt, gear, name
+  tag, and a matching dot on the team roster. Same color on every screen
+  without a database field.
+- **Bodies, faces, hair, props.** Floating = an inner tube in your color;
+  raft = planks and a little flag; underwater = mask, snorkel poking above
+  the surface, bubbles; struck = hair on end and hands up; coconut = a striped
+  lounge chair, reclined body, a coconut with a straw and a paper umbrella;
+  waving = a proper hand. A soft reflection under anyone on the water.
+- **The land got warmer**: wildflowers in sun-gold, coral, foam, and mauve
+  that fade out as severity rises (the first color to go when the weather
+  turns); a warm earthen cut-bank with a dry sandy lip; some canopies tinted
+  toward sun; mossy caps on rocks in fair weather; low warm light pooling at
+  the horizon when the sun is out.
+- In the storm, the people's colors are the only warmth left in the frame —
+  which is the point.
+
 ### Second review pass over the delta (Fri ~4 AM): 18 agents, 9 confirmed
 
 Everything since the first review got the same adversarial treatment. Fixed:
