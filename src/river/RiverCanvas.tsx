@@ -704,7 +704,7 @@ export default function RiverCanvas({
             return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           case 'rapids': {
-            const { x, y, sp } = pointAt(0.52, 0.35)
+            const { x, y, sp } = pointAt(0.47, 0.3)
             return { x: x + fan(k, n) * sp.tx * sp.s, y: y + fan(k, n) * sp.ty * sp.s, s: sp.s, onLand: false }
           }
           case 'rock': {

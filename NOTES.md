@@ -337,6 +337,17 @@ floating over it and riverstone mood selectors. Adapted rather than pasted:
 - Mood tiles became riverstones (irregular radii, wet glow when chosen, clay
   for a 1); labels moved to a live caption under the stones.
 - Verified: click-through, scenes, light/dark, mobile sheet, collapsed state.
+- **Second pass to match the mockup's composition** (merged Friday morning):
+  the island moved bottom-center with the brand and tabs inside it (a pebble
+  dot marks the active tab), the ping stones come first, the scene name
+  moved top-left over the sky, and the header slimmed to theme + sign-out.
+  The stream now ends above the panel via `bottomInset`. One regression
+  caught by the phone screenshot: App.css's header-era `.tabs { order: 3 }`
+  rule was pushing the in-panel tabs to the bottom of the sheet. Shared
+  water spots fan *along* the current so nobody drifts under the glass.
+- What we deliberately did not chase from the mockup: its hand-painted art
+  style. That's an image; ours is drawn live so the weather, spots, and poses
+  can change in every open window — the whole point of the app.
 
 ### Color and character (Fri ~4:30 AM): the people stop being stick figures
 
