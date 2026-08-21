@@ -483,6 +483,13 @@ each finding independently verified before it counted:
 - The scene title got a second tight text-shadow so a pale cloud drifting
   behind it can't swallow the word.
 
+The first cut of the overlap-nudge spaced people by body width and production
+promptly disproved it: name tags are drawn at a fixed 10.5px regardless of
+depth, so "sergiobanuelos" ran straight through "ana" while both bodies were
+comfortably apart. The pass now measures the string it actually draws
+(`ctx.measureText`, bold face — the wider of the two) and spaces by tag width.
+The screenshot that catches you is always the one with a real name in it.
+
 ### Color and character (Fri ~4:30 AM): the people stop being stick figures
 
 The developer's last note: still too plain, characters too basic, more color.

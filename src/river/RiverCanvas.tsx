@@ -829,14 +829,24 @@ export default function RiverCanvas({
       // People on a landmark (the rock, the tree's shade) stay put and act as
       // obstacles; only the ones floating get moved. Rebuilt every frame from
       // the same inputs, so it settles identically instead of drifting.
+      // What has to clear is the NAME TAG, not the body: the tag is drawn at a
+      // fixed 10.5px regardless of depth, so a long name is far wider than the
+      // person under it. Measure the string actually drawn (bold — the wider
+      // of the two faces — so the spacing holds for whoever is "me").
+      ctx.save()
+      ctx.font = '600 10.5px system-ui, sans-serif'
+      const halfW = placed.map((p) =>
+        Math.max(22 * p.s, ctx.measureText(p.m.displayName.slice(0, 14)).width / 2 + 4),
+      )
+      ctx.restore()
       for (let pass = 0; pass < 3; pass++) {
         let moved = false
         for (let a = 0; a < placed.length; a++) {
           for (let b = a + 1; b < placed.length; b++) {
             const A = placed[a]
             const B = placed[b]
-            if (Math.abs(A.y - B.y) > 26 * Math.max(A.s, B.s)) continue
-            const need = 30 * (A.s + B.s)
+            if (Math.abs(A.y - B.y) > Math.max(26 * Math.max(A.s, B.s), 16)) continue
+            const need = halfW[a] + halfW[b]
             const dx = B.x - A.x
             const gap = Math.abs(dx)
             if (gap >= need) continue
