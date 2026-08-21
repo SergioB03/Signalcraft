@@ -99,8 +99,11 @@ export default function RiverCanvas({ scene, members }: Props) {
     let lightningFlash = 0
     let nextLightningAt = 0
 
+    // The dpr used to size the backing store — draw() must divide by THIS,
+    // not the live devicePixelRatio, or browser zoom mid-demo garbles the scene.
+    let dpr = window.devicePixelRatio || 1
     const size = () => {
-      const dpr = window.devicePixelRatio || 1
+      dpr = window.devicePixelRatio || 1
       const w = wrap.clientWidth
       const h = Math.min(420, Math.max(240, Math.round(w * 0.45)))
       for (const c of [canvas, overlay]) {
@@ -124,8 +127,8 @@ export default function RiverCanvas({ scene, members }: Props) {
     }
 
     const draw = (now: number) => {
-      const w = canvas.width / (window.devicePixelRatio || 1)
-      const h = canvas.height / (window.devicePixelRatio || 1)
+      const w = canvas.width / dpr
+      const h = canvas.height / dpr
       const tw = tweenRef.current
       const progress = easeInOut(Math.min(1, (now - tw.start) / TWEEN_MS))
       const p = mix(tw.from, tw.to, progress)
@@ -291,6 +294,8 @@ export default function RiverCanvas({ scene, members }: Props) {
     drawStaticRef.current = drawStatic
 
     const loop = (now: number) => {
+      // Self-heal on zoom / monitor moves: dpr changes don't fire ResizeObserver.
+      if ((window.devicePixelRatio || 1) !== dpr) size()
       draw(now)
       raf = requestAnimationFrame(loop)
     }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   confirmSignUp,
   fetchAuthSession,
@@ -54,8 +54,20 @@ function useTheme() {
   return { theme, toggle: () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')) }
 }
 
+// Local calendar day, not UTC — the ping day should roll at the user's
+// midnight, not at 8 PM ET (UTC midnight), or an evening ping blocks tomorrow
+// afternoon's.
+function localDayKey(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export default function App() {
   const [stage, setStage] = useState<Stage>('loading')
+  // Theme lives at the top so the sign-in screen honors the saved/system
+  // preference too — not just the river behind it.
+  const { theme, toggle } = useTheme()
 
   useEffect(() => {
     getCurrentUser()
@@ -64,7 +76,8 @@ export default function App() {
   }, [])
 
   if (stage === 'loading') return <main className="shell" />
-  if (stage === 'in') return <River onSignOut={() => setStage('signIn')} />
+  if (stage === 'in')
+    return <River onSignOut={() => setStage('signIn')} theme={theme} onToggleTheme={toggle} />
   return <AuthGate stage={stage} setStage={setStage} />
 }
 
@@ -93,6 +106,21 @@ function AuthGate({
     }
   }
 
+  // Amplify v6 gotcha: signing in with an unconfirmed account RESOLVES (no
+  // throw) with isSignedIn:false — ignoring nextStep would mount the app with
+  // no session and a permanently dead screen.
+  const finishSignIn = async () => {
+    const result = await signIn({ username: email, password })
+    if (result.isSignedIn) {
+      setStage('in')
+    } else if (result.nextStep.signInStep === 'CONFIRM_SIGN_UP') {
+      setStage('confirm')
+      throw new Error('this account still needs its email confirmed — enter the code from your inbox.')
+    } else {
+      throw new Error(`sign-in needs another step (${result.nextStep.signInStep}).`)
+    }
+  }
+
   const submit = () =>
     run(async () => {
       if (stage === 'signUp') {
@@ -100,11 +128,9 @@ function AuthGate({
         setStage('confirm')
       } else if (stage === 'confirm') {
         await confirmSignUp({ username: email, confirmationCode: code })
-        await signIn({ username: email, password })
-        setStage('in')
+        await finishSignIn()
       } else {
-        await signIn({ username: email, password })
-        setStage('in')
+        await finishSignIn()
       }
     })
 
@@ -167,8 +193,15 @@ function AuthGate({
   )
 }
 
-function River({ onSignOut }: { onSignOut: () => void }) {
-  const { theme, toggle } = useTheme()
+function River({
+  onSignOut,
+  theme,
+  onToggleTheme,
+}: {
+  onSignOut: () => void
+  theme: 'dark' | 'light'
+  onToggleTheme: () => void
+}) {
   const [weather, setWeather] = useState<WeatherRow | null>(null)
   const [members, setMembers] = useState<MembershipRow[]>([])
   const [myUserId, setMyUserId] = useState<string | null>(null)
@@ -266,7 +299,7 @@ function River({ onSignOut }: { onSignOut: () => void }) {
         <span className="header-actions">
           <button
             className="link"
-            onClick={toggle}
+            onClick={onToggleTheme}
             aria-label={`switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
           >
             {theme === 'dark' ? 'daylight' : 'dusk'}
@@ -400,39 +433,66 @@ function PingForm() {
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'already'>('idle')
   const [error, setError] = useState('')
 
+  // If the ping fails after the receipt was created, the retry must skip
+  // receipt creation — recreating it loses the conditional write and would
+  // falsely read as "already pinged today".
+  const receiptHeld = useRef(false)
+
   const submit = useCallback(async () => {
     if (selected === null) return
     setStatus('sending')
     setError('')
-    const { userId } = await getCurrentUser()
-    const dayKey = new Date().toISOString().slice(0, 10)
+    try {
+      const { userId } = await getCurrentUser()
+      const dayKey = localDayKey()
 
-    // Two records, deliberately separate: the receipt names you but holds no
-    // score; the ping holds your score but doesn't name you. The receipt's
-    // deterministic id makes the second ping of the day fail at the database.
-    const receipt = await client.models.PingReceipt.create({
-      id: `${userId}#${dayKey}`,
-      teamId: TEAM_ID,
-      userId,
-      dayKey,
-    })
-    if (receipt.errors) {
-      setStatus('already')
-      return
-    }
+      // Two records, deliberately separate: the receipt names you but holds no
+      // score; the ping holds your score but doesn't name you. The receipt's
+      // deterministic id makes the second ping of the day fail at the database.
+      if (!receiptHeld.current) {
+        const receipt = await client.models.PingReceipt.create({
+          id: `${userId}#${dayKey}`,
+          teamId: TEAM_ID,
+          userId,
+          dayKey,
+        })
+        if (receipt.errors) {
+          // Only a conditional-write conflict means "already pinged" — any
+          // other failure (network, auth) gets honest copy and a retry path.
+          const duplicate = receipt.errors.some((e) =>
+            `${(e as { errorType?: string }).errorType ?? ''} ${e.message}`
+              .toLowerCase()
+              .includes('condition'),
+          )
+          if (duplicate) {
+            setStatus('already')
+          } else {
+            setError('could not reach the river — check your connection and try again.')
+            setStatus('idle')
+          }
+          return
+        }
+        receiptHeld.current = true
+      }
 
-    const ping = await client.models.Ping.create({
-      teamId: TEAM_ID,
-      score: selected,
-      note: note.trim() || undefined,
-      expiresAt: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
-    })
-    if (ping.errors) {
-      setError('your ping did not go through — try again.')
+      const ping = await client.models.Ping.create({
+        teamId: TEAM_ID,
+        score: selected,
+        note: note.trim() || undefined,
+        // 8 days, not 24h: the weekly report needs the rows to still exist.
+        // The weather window is enforced by createdAt, so this changes nothing there.
+        expiresAt: Math.floor(Date.now() / 1000) + 8 * 24 * 60 * 60,
+      })
+      if (ping.errors) {
+        setError('your ping did not go through — try again.')
+        setStatus('idle')
+        return
+      }
+      setStatus('done')
+    } catch {
+      setError('something interrupted the ping — check your connection and try again.')
       setStatus('idle')
-      return
     }
-    setStatus('done')
   }, [selected, note])
 
   if (status === 'done') return <p className="pinged">your ping is in the river. see you tomorrow.</p>

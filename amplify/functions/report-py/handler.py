@@ -52,6 +52,9 @@ def handler(event, _context):
     return {"batchItemFailures": []}
 
 
+ANONYMITY_FLOOR = 5  # same floor as the weather Lambda, same reasoning
+
+
 def generate_report(team_id: str) -> None:
     now = dt.datetime.now(dt.timezone.utc)
     period_start = now - dt.timedelta(days=REPORT_DAYS)
@@ -68,8 +71,33 @@ def generate_report(team_id: str) -> None:
         )
         return
 
+    # Anonymity floor, mirrored from the weather path: below 5 pings an
+    # "aggregate" is close to being someone's individual answer, so it never
+    # reaches Bedrock or the lead.
+    if len(pings) < ANONYMITY_FLOOR:
+        write_report(
+            team_id,
+            period_start,
+            now,
+            body=f"Only {len(pings)} ping{'s' if len(pings) != 1 else ''} came in this "
+            f"week — below the {ANONYMITY_FLOOR}-ping floor, a summary would be too "
+            "close to individual answers, so none is generated.",
+            suggested_action="Encourage a few more daily pings; the report unlocks at "
+            f"{ANONYMITY_FLOOR}.",
+        )
+        return
+
     aggregates = build_aggregates(pings, now)
-    body, action = ask_claude(aggregates)
+    try:
+        body, action = ask_claude(aggregates)
+    except Exception as err:  # noqa: BLE001 — a report row must always land
+        print(f"report[{team_id}] bedrock call failed: {err}")
+        body = (
+            f"The writing assistant is unavailable right now, so here are the plain "
+            f"numbers: {aggregates['total_pings']} pings this week, overall average "
+            f"{aggregates['overall_average']} out of 5."
+        )
+        action = "Try generating again in a few minutes."
     write_report(team_id, period_start, now, body, action)
     print(f"report[{team_id}] written ({len(pings)} pings)")
 
@@ -95,13 +123,20 @@ def build_aggregates(pings: list[dict], now: dt.datetime) -> dict:
     notes: set[str] = set()
     for ping in pings:
         day = str(ping.get("createdAt", ""))[:10]
-        by_day.setdefault(day, []).append(int(ping["score"]))
+        # Clamp mirrors the schema validation — a crafted score can't skew this.
+        by_day.setdefault(day, []).append(min(5, max(1, int(ping["score"]))))
         note = str(ping.get("note") or "").strip()
         if note:
             notes.add(note)
 
+    # Days with fewer than 3 pings keep their count but hide the average —
+    # a one-ping day's "average" is one person's exact answer with a date on it.
     daily = [
-        {"day": day, "count": len(scores), "average": round(sum(scores) / len(scores), 2)}
+        {
+            "day": day,
+            "count": len(scores),
+            "average": round(sum(scores) / len(scores), 2) if len(scores) >= 3 else None,
+        }
         for day, scores in sorted(by_day.items())
     ]
     # Dedup (via the set) and shuffle so note order can't hint at timing/identity.
@@ -119,8 +154,11 @@ def build_aggregates(pings: list[dict], now: dt.datetime) -> dict:
 
 
 PROMPT = """You are writing a short private briefing for a team lead. The data
-below is a week of anonymous 1-5 mood pings from their team (5 = great,
-1 = struggling), plus anonymous free-text notes in random order.
+below is up to a week of anonymous 1-5 mood pings from their team (5 = great,
+1 = struggling), plus anonymous free-text notes in random order. Days with a
+null average had too few pings to summarize without risking anonymity — do not
+guess at them. Only describe change over time if the data actually spans
+multiple days.
 
 {data}
 
@@ -148,8 +186,10 @@ def ask_claude(aggregates: dict) -> tuple[str, str]:
 
     body, action = text, ""
     if "ACTION:" in text:
-        body, _, action = text.partition("ACTION:")
-    return body.strip(), action.strip()
+        # rpartition + residue stripping: models sometimes bold the label
+        # ("**ACTION:**"), which would leave dangling asterisks in the UI.
+        body, _, action = text.rpartition("ACTION:")
+    return body.strip().rstrip("*#").strip(), action.strip().lstrip("*# ").strip()
 
 
 def write_report(

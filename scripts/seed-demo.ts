@@ -8,11 +8,20 @@
  * client-orchestration gap we logged — pings created without receipts. Useful
  * for a demo, and exhibit A for why real enforcement belongs server-side.
  */
+import { readFileSync } from 'node:fs'
 import { Amplify } from 'aws-amplify'
 import { signIn, signOut } from 'aws-amplify/auth'
 import { generateClient } from 'aws-amplify/data'
 import type { Schema } from '../amplify/data/resource'
-import outputs from '../amplify_outputs.json'
+
+// OUTPUTS env var targets another backend (e.g. the production branch's
+// generated outputs); defaults to the local sandbox.
+const outputs = JSON.parse(
+  readFileSync(
+    process.env.OUTPUTS ?? new URL('../amplify_outputs.json', import.meta.url),
+    'utf8',
+  ),
+)
 
 const TEAM_ID = 'demo-team'
 
@@ -45,7 +54,7 @@ for (const seed of SEEDS) {
     teamId: TEAM_ID,
     score: seed.score,
     note: seed.note,
-    expiresAt: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+    expiresAt: Math.floor(Date.now() / 1000) + 8 * 24 * 60 * 60,
   })
   if (errors) console.error('seed failed:', JSON.stringify(errors))
   else console.log(`seeded score=${seed.score}${seed.note ? ` "${seed.note}"` : ''}`)

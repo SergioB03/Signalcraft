@@ -14,14 +14,21 @@ type Scene = NonNullable<Schema['WeatherState']['type']['scene']>;
 // @types/aws-lambda dependency for the two fields we actually read.
 type StreamRecord = {
   eventName?: string;
-  dynamodb?: { NewImage?: Record<string, { S?: string; N?: string }> };
+  dynamodb?: {
+    NewImage?: Record<string, { S?: string; N?: string }>;
+    OldImage?: Record<string, { S?: string; N?: string }>;
+  };
 };
 
 export const handler = async (event: { Records?: StreamRecord[] }) => {
   const teamIds = new Set<string>();
   for (const record of event.Records ?? []) {
-    if (record.eventName !== 'INSERT') continue;
-    const teamId = record.dynamodb?.NewImage?.teamId?.S;
+    // INSERT = new ping; REMOVE = TTL expiry. Recomputing on both keeps the
+    // "N pings today" caption honest after old pings age out.
+    if (record.eventName !== 'INSERT' && record.eventName !== 'REMOVE') continue;
+    const image =
+      record.eventName === 'INSERT' ? record.dynamodb?.NewImage : record.dynamodb?.OldImage;
+    const teamId = image?.teamId?.S;
     if (teamId) teamIds.add(teamId);
   }
   for (const teamId of teamIds) {
@@ -41,7 +48,9 @@ async function recomputeWeather(teamId: string): Promise<void> {
       nextToken,
     });
     if (errors) throw new Error(`Ping.list failed: ${JSON.stringify(errors)}`);
-    scores.push(...data.map((p) => p.score));
+    // Belt-and-suspenders with the schema validation: clamp so a crafted
+    // out-of-range score can never pin the weather.
+    scores.push(...data.map((p) => Math.min(5, Math.max(1, p.score))));
     nextToken = nt;
   } while (nextToken);
 

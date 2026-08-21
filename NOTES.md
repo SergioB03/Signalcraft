@@ -137,11 +137,53 @@ ever needs client-side ping reads.
   realtime religion, because direct DynamoDB writes don't fire subscriptions and
   hand-signing AppSync calls from Python wasn't worth it for a lead-only,
   once-a-week surface. Tradeoff logged, demo unaffected.
-- **Model: Claude Opus 5** (`us.anthropic.claude-opus-5` inference profile) per
-  current guidance — at ~one 500-token report on demand, model cost is noise.
+- **Model: Claude Haiku 4.5** (`us.anthropic.claude-haiku-4-5-20251001-v1:0`).
+  We wanted Opus 5, but an empirical sweep showed the Opus/Sonnet 5 tiers are
+  sales-gated on a brand-new AWS account ("not available for this account,
+  contact AWS Sales"). Haiku 4.5 is the most capable Anthropic model the
+  account can invoke — and honestly right-sized for a 4-sentence weekly
+  summary. Availability constraint, not a cost decision.
 - Seed script added (Tier 2 #12) — and it works through exactly the
   client-orchestration gap we logged earlier (pings without receipts), which is
   both convenient tonight and exhibit A for the article's honesty section.
+
+### Pre-submission review: 32 agents, 28 findings, 23 confirmed
+
+Ran a multi-agent adversarial review (four dimension reviewers, every claim
+handed to a verifier instructed to refute it). The keepers, all fixed the same
+night:
+
+- **Unconfirmed sign-in trap**: Amplify v6's `signIn` *resolves* (doesn't
+  throw) for unconfirmed accounts; ignoring `nextStep` mounted the app with no
+  session — a permanently dead screen for any judge who abandoned the confirm
+  code and came back. Now routed back to the confirm step.
+- **Unbounded scores**: nothing stopped a crafted `score: 9999` from pinning
+  the weather at "clear". Added schema validation (1–5, note ≤ 140) plus
+  defensive clamps in both Lambdas.
+- **The 24h TTL ate the weekly report**: pings expired daily, so the 7-day
+  report window could never see more than a day. TTL is now 8 days; the
+  weather window was always enforced by `createdAt`, so nothing else moved.
+- **Report path lacked the anonymity floor**: it would happily summarize 2
+  pings — close to individual answers. Now mirrors the weather floor (no
+  report under 5 pings; daily averages withheld under 3).
+- **Bedrock failure = silent 60s timeout**: now writes a plain-numbers
+  fallback report so the lead's button always resolves.
+- **UTC day-key**: the ping day rolled at 8 PM ET, so an evening rehearsal
+  ping would have blocked the live 3 PM demo ping. Now local-midnight.
+- **Light theme swallowed --sun**: focus ring and ping confirmation were
+  ~1.3:1 contrast on pale background. Light theme now darkens the accent.
+- Smaller: canvas garbling on browser-zoom (stale devicePixelRatio), honest
+  error copy in the ping form (transient failures no longer read as "already
+  pinged"), weather recompute on TTL expiry so the caption can't go stale,
+  the spec's display typeface (Fraunces) actually applied, README replaced,
+  docs corrected (report model, function paths, what Bedrock receives).
+
+**Accepted, documented, not fixed** (hackathon scope, honest-article
+material): the receipt→ping pair is client-orchestrated, so a hand-crafted
+API call can create pings without a receipt (bounded now by score
+validation); a hostile signed-up account could pre-create another user's
+receipt id or fake Membership rows. Real enforcement means a custom mutation
+doing both writes server-side — first item on the post-challenge list.
 
 ### Decision: scaffold = Vite template + `create-amplify` on top
 

@@ -8,11 +8,18 @@
  *
  * Exits 0 on PASS (subscription event within 30s of the ping), 1 on FAIL.
  */
+import { readFileSync } from 'node:fs'
 import { Amplify } from 'aws-amplify'
 import { signIn, signOut } from 'aws-amplify/auth'
 import { generateClient } from 'aws-amplify/data'
 import type { Schema } from '../amplify/data/resource'
-import outputs from '../amplify_outputs.json'
+
+const outputs = JSON.parse(
+  readFileSync(
+    process.env.OUTPUTS ?? new URL('../amplify_outputs.json', import.meta.url),
+    'utf8',
+  ),
+)
 
 const TEAM_ID = 'demo-team'
 const email = process.env.TEST_EMAIL
@@ -52,7 +59,7 @@ const baseline = received
 const ping = await client.models.Ping.create({
   teamId: TEAM_ID,
   score,
-  expiresAt: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
+  expiresAt: Math.floor(Date.now() / 1000) + 8 * 24 * 60 * 60,
 })
 if (ping.errors) {
   console.error('[ping] create failed:', JSON.stringify(ping.errors))

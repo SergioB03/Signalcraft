@@ -12,11 +12,13 @@
   --on-accent: #1b2027;
 }
 
-/* pale overcast sky; same accents */
+/* pale overcast sky; same accents — except --sun, which must darken or the
+   focus ring and ping confirmation vanish into the pale background */
 :root[data-theme='light'] {
   --silt: #edf1f3;
   --stone: #dce3e8;
   --foam: #1b2027;
+  --sun: #8a6a1f;
   --clay: #8a4d2e;
   --on-accent: #edf1f3;
 }
@@ -32,6 +34,14 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   line-height: 1.5;
   transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* the display face (CLAUDE.md §7): weight and a little humanity for the
+   scene name and headings; body/UI stays on the quiet system sans */
+h1,
+h2,
+.brand {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
 }
 
 button {

@@ -6,11 +6,18 @@
  * Run:  npx tsx scripts/prove-report.ts   (TEST_EMAIL must be in the lead group)
  * Exits 0 on PASS (a new Report appears within 90s), 1 on FAIL.
  */
+import { readFileSync } from 'node:fs'
 import { Amplify } from 'aws-amplify'
 import { signIn, signOut } from 'aws-amplify/auth'
 import { generateClient } from 'aws-amplify/data'
 import type { Schema } from '../amplify/data/resource'
-import outputs from '../amplify_outputs.json'
+
+const outputs = JSON.parse(
+  readFileSync(
+    process.env.OUTPUTS ?? new URL('../amplify_outputs.json', import.meta.url),
+    'utf8',
+  ),
+)
 
 const TEAM_ID = 'demo-team'
 const email = process.env.TEST_EMAIL
@@ -48,6 +55,17 @@ while (Date.now() < deadline) {
     console.log('\n--- REPORT ---')
     console.log(fresh.body)
     console.log(`\nACTION: ${fresh.suggestedAction}`)
+    // A fallback body means the pipeline ran but Bedrock did NOT — that must
+    // not read as proof of the Bedrock leg.
+    const body = fresh.body ?? ''
+    if (
+      body.startsWith('No pings in the last week') ||
+      body.startsWith('Only ') ||
+      body.startsWith('The writing assistant is unavailable')
+    ) {
+      console.error('\nREPORT PROOF: FAIL — a fallback report arrived; Bedrock was not exercised.')
+      process.exit(1)
+    }
     console.log('\nREPORT PROOF: PASS')
     process.exit(0)
   }

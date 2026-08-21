@@ -162,8 +162,8 @@ Under `prefers-reduced-motion`, scenes render statically and crossfade.
 |---|---|---|
 | `src/` — React app, canvas river | TypeScript | Frontend stack |
 | `amplify/` — backend definitions (auth, data, wiring) | TypeScript | Amplify Gen 2 defines infrastructure in TS; this is not optional |
-| `amplify/functions/weather/` — weather aggregation | TypeScript | Hot path; uses Amplify's IAM-authed data client so the AppSync mutation (and therefore the subscription) actually fires |
-| `amplify/functions/report/` — Bedrock report | Python 3.12 | Off the critical path, boto3-only (no packaging), invoked on demand by leads. Deliberate learning slice. |
+| `amplify/functions/compute-weather/` — weather aggregation | TypeScript | Hot path; uses Amplify's IAM-authed data client so the AppSync mutation (and therefore the subscription) actually fires |
+| `amplify/functions/report-py/` — Bedrock report | Python 3.12 | Off the critical path, boto3-only (no packaging), invoked on demand by leads. Deliberate learning slice. |
 
 ## Why it's built this way — the five load-bearing decisions
 
@@ -184,7 +184,10 @@ Under `prefers-reduced-motion`, scenes render statically and crossfade.
 ## Privacy boundary for GenAI
 
 The Python report Lambda sends Bedrock **aggregates only**: date range, ping counts,
-daily averages, scene history, and note text that has been deduped and order-shuffled.
-Never individual scores, never a note tied to a person — the Lambda physically can't,
-because pings carry no author. Same principle as the schema: the boundary is
-structural, enforced where the data leaves the system.
+daily averages, and note text that has been deduped and order-shuffled. Never
+individual scores, never a note tied to a person — the Lambda physically can't,
+because pings carry no author. Two extra floors on top of the structural anonymity:
+no report is generated at all below 5 pings (mirroring the weather floor), and days
+with fewer than 3 pings report their count but withhold the average — a one-ping
+day's "average" is one person's exact answer with a date on it. Same principle as
+the schema: the boundary is structural, enforced where the data leaves the system.

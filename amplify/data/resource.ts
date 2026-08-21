@@ -8,9 +8,12 @@ import { computeWeather } from '../functions/compute-weather/resource';
  *   PingReceipt carries a userId but NO score.
  *
  * A schema physically cannot leak what it never stored. One-ping-per-day is
- * enforced by giving PingReceipt a deterministic id (`${userId}#${dayKey}`) —
- * Amplify's create mutation has a built-in attribute_not_exists(id) condition,
- * so the second receipt of the day is rejected by DynamoDB itself.
+ * enforced on the honest client path by giving PingReceipt a deterministic id
+ * (`${userId}#${dayKey}`) — Amplify's create mutation carries a built-in
+ * attribute_not_exists(id) condition, so the second receipt of the day loses.
+ * Known limitation (documented in NOTES.md): the receipt→ping pair is
+ * client-orchestrated, so a hand-crafted API call can still create pings
+ * without a receipt; score bounds below cap the damage.
  */
 const schema = a
   .schema({
@@ -36,8 +39,13 @@ const schema = a
     Ping: a
       .model({
         teamId: a.id().required(),
-        score: a.integer().required(),
-        note: a.string(),
+        // Server-side bounds: without these, one crafted score of 9999 pins
+        // the average (and therefore the weather) regardless of everyone else.
+        score: a
+          .integer()
+          .required()
+          .validate((v) => v.gte(1).lte(5)),
+        note: a.string().validate((v) => v.maxLength(140)),
         // Epoch seconds; DynamoDB TTL deletes the row ~24h later (lazy —
         // the weather window is enforced by createdAt in the Lambda).
         expiresAt: a.timestamp(),
