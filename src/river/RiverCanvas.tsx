@@ -185,7 +185,12 @@ export default function RiverCanvas({ scene, members }: Props) {
     const size = () => {
       dpr = currentDpr()
       const w = wrap.clientWidth
-      const h = Math.min(460, Math.max(260, Math.round(w * 0.5)))
+      // Phones get a taller frame: a narrow stream needs vertical room for the
+      // avatars to sit above the scene name instead of on it.
+      const h =
+        w < 600
+          ? Math.min(380, Math.max(280, Math.round(w * 0.8)))
+          : Math.min(460, Math.max(260, Math.round(w * 0.5)))
       for (const c of [canvas, overlay]) {
         c.width = Math.round(w * dpr)
         c.height = Math.round(h * dpr)
@@ -481,10 +486,15 @@ export default function RiverCanvas({ scene, members }: Props) {
       }
 
       // --- avatars: fixed slots down the stream, far ones first ------------
+      // The bottom third of the frame belongs to the scene name, so slots stop
+      // short of it. Narrow frames zig-zag across the stream to keep names apart.
       const list = membersRef.current
-      const lanes = [-0.42, 0.4, 0, -0.22, 0.24, -0.48, 0.46]
+      const narrow = w < 600
+      const lanes = narrow ? [-0.6, 0.6, 0] : [-0.42, 0.4, 0, -0.22, 0.24, -0.48, 0.46]
+      const vStart = narrow ? 0.16 : 0.2
+      const vSpan = narrow ? 0.48 : 0.48
       list.forEach((m, i) => {
-        const v = 0.2 + ((i + 0.5) / list.length) * 0.72
+        const v = vStart + ((i + 0.5) / list.length) * vSpan
         const y = ground(v)
         const r = riverT(y)
         const x = centerX(y) + lanes[i % lanes.length] * halfWidth(y) * 0.8
@@ -492,7 +502,9 @@ export default function RiverCanvas({ scene, members }: Props) {
         const bob = reducedMotion.matches
           ? 0
           : Math.sin(t * 0.002 * (1 + sev * 2) + i * 1.7) * (1 + sev * 6) * s
-        drawAvatar(ctx, m, x, y + bob, t, i, s)
+        // On a phone, six name tags in a 140px stream can't all fit — keep
+        // yours; the team tab names everyone.
+        drawAvatar(ctx, m, x, y + bob, t, i, s, !narrow || m.isMe)
       })
     }
 
@@ -587,6 +599,7 @@ function drawAvatar(
   t: number,
   i: number,
   s: number,
+  showName = true,
 ) {
   ctx.save()
   ctx.translate(x, y)
@@ -674,11 +687,13 @@ function drawAvatar(
   ctx.restore()
 
   // name tag, unscaled so it stays legible at the far end
-  ctx.globalAlpha = 1
-  ctx.font = '10.5px system-ui, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillStyle = m.isMe ? SUN_CSS : 'rgba(230, 237, 242, 0.85)'
-  ctx.fillText(m.displayName.slice(0, 14), 0, 14 * s + 10)
+  if (showName) {
+    ctx.globalAlpha = 1
+    ctx.font = '10.5px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillStyle = m.isMe ? SUN_CSS : 'rgba(230, 237, 242, 0.85)'
+    ctx.fillText(m.displayName.slice(0, 14), 0, 14 * s + 10)
+  }
   ctx.restore()
 }
 
