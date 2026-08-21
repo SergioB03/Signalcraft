@@ -137,6 +137,13 @@ ever needs client-side ping reads.
   realtime religion, because direct DynamoDB writes don't fire subscriptions and
   hand-signing AppSync calls from Python wasn't worth it for a lead-only,
   once-a-week surface. Tradeoff logged, demo unaffected.
+- **Second gate after verification: the Anthropic use-case form.** Invokes
+  then failed with "Model use case details have not been submitted for this
+  account." The console buries the form; the CLI exposes it directly
+  (`aws bedrock put-use-case-for-model-access` with a base64 JSON body —
+  name, website, internal/external users, industry, use case). Submitted
+  from the terminal; about fifteen minutes later the report pipeline passed
+  end to end.
 - **Model: Claude Haiku 4.5** (`us.anthropic.claude-haiku-4-5-20251001-v1:0`).
   We wanted Opus 5, but an empirical sweep showed the Opus/Sonnet 5 tiers are
   sales-gated on a brand-new AWS account ("not available for this account,
