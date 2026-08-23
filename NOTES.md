@@ -56,3 +56,9 @@
 - **Bedrock gates carry over.** Account verification and the Anthropic use-case form are
   account-level, not app-level, so Signalcraft skips both waits — still confirm with one
   10-second CLI `converse` call before writing the log Lambda, as Undercurrent's notes advise.
+- **Marketing package drafted before a line of feature code.** `docs/marketing/` holds
+  positioning, Scrap's voice guide (goes verbatim into the Bedrock prompt), UI microcopy,
+  and the posts; `docs/article.md` is the qualifying-article skeleton with `[TODO]`s for
+  facts only the build can supply; `docs/demo-script.md` is the 75-second shot list.
+  The point of doing it first: the copy now constrains the build (captions per power
+  state, seeded-entry label, footer line) instead of being reverse-engineered Sunday night.
