@@ -80,3 +80,19 @@
 - **Undercurrent stays intact.** Nothing deleted — river, WeatherState, ReportPanel, sim
   mode (hidden behind an explicit opt-in). Additive delta only; the river doubles as the
   on-screen proof that mood and power are different things.
+- **Completeness critic, second pass.** Transferred: (1) the ping → check-in rename now
+  lists every rendered string by line, with `grep "ping" src/App.tsx` as the done-when;
+  (2) a human submits a check-in from the real form on the live URL before the recording
+  — scripts had been the only proof; (3) push after steps 3 and 4 and confirm the Amplify
+  job succeeds, so a service-role problem with the scheduler surfaces at 1 PM, not 8 PM;
+  (4) budget notifications spelled out (ACTUAL 80, ACTUAL 100, FORECASTED 100 — forecast
+  alerts are inert on a new account, so the ACTUAL ones are the real guard);
+  (5) the backfill path refuses any dayKey at or after today so it can never pre-empt the
+  scheduler's entry, and Steve gets that as a third question; (6) Scrap's `expression`
+  is wired from the river's weather (rough/storm → concerned) — mood reaches his face,
+  never his power, which is exactly what §6 allows and gives the article a line;
+  (7) copy honesty: "one sort key" → one composite id and a conditional write; "exactly
+  three things" → four; "Sunday afternoon" → evening; the first autonomous entry is
+  *scheduled* until Monday's paste proves it; teardown names both schedules.
+- **Cut, stated:** §7's "power state history" is not in the nightly aggregates — the
+  entry carries the day's final power state only. The article must not claim more.

@@ -23,6 +23,6 @@ Lowercase house style (matches Undercurrent). Scrap is always capitalized.
 | Empty state: archive | no earlier nights yet. each night adds one entry, and none are ever overwritten. |
 | Empty state: no check-ins today (group tab) | nobody has checked in yet today. Scrap is asleep, not gone. |
 | Group tab participation line | {n} checked in today — never who, never what they said. |
-| Footer disclosure | concept build — running through Sun Aug 30, 2026. log entries before {first real date} are seeded. Scrap is drawn in code; Bedrock writes only the log. |
+| Footer disclosure | concept build — running through Sun Aug 30, 2026. log entries before Aug 23 are seeded. Scrap is drawn in code; Bedrock writes only the log. |
 | Log panel loading | reading last night… |
 | Theme toggle | daylight / dusk (unchanged from Undercurrent) |

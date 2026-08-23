@@ -183,11 +183,12 @@ README so future-you actually does it.
   symbol, then Read with offset/limit.
 - **One PLAN.md step per session** where possible. End every session with a green
   `npm run build`, `npx tsc -p amplify/tsconfig.json`, a commit, and a NOTES.md entry.
-- **Agents** (`.claude/agents/`): `staff-engineer` — review the step's diff before committing
-  (spawn it; do not self-review at length). `marketing` — anything a reader sees: README,
+- **Agents** (`.claude/agents/`): `staff-engineer` — review the diff before committing on the backend steps (3, 4; 6
+  optional) — spawn it; do not self-review at length. `marketing` — anything a reader sees: README,
   article, posts, microcopy. `tutor` — learn mode (cheap model). **Steve** (`/initiate-steve`,
-  hosted Managed Agent, costs real API money) once, after step 4, with two yes/no questions
-  (Bedrock call cap; dayKey overwrite / score leak); an optional second in the stop-line buffer.
+  hosted Managed Agent, costs real API money) once, after step 4, with three yes/no questions
+  (Bedrock call cap; dayKey overwrite / score leak; backfill pre-empting the scheduler); an
+  optional second in the stop-line buffer. Where this section and PLAN.md differ, PLAN.md wins.
 - **Learn mode is ON.** After each step, append an entry to `docs/learn/JOURNAL.md` (React
   concept + system-design concept anchored to file:line, one check question, one "at scale"
   line). Inline if the step was small; spawn `tutor` if it touched more than ~3 files.

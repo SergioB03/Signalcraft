@@ -16,7 +16,7 @@ Scrap is powered by honesty, not by happiness. A terrible day powers him exactly
 3. Scrap is not a chatbot you poke. He acts at night, alone, on an EventBridge schedule, and you find what he wrote in the morning.
 4. I could have generated Scrap with an image model. By night four he would have been a different robot. So he is SVG with named parts, and Bedrock only writes what is around him.
 5. A hackathon agent with a nightly cron and no teardown date is a bill waiting to happen. The footer says the day it stops.
-6. One weekend, one working codebase, three new things: a scheduler, a character, a date-keyed log. Everything else was already there.
+6. One weekend, one working codebase, four new things: a clock, a power meter, a character, a date-keyed log. Everything else was already there.
 7. The demo archive is seeded and the article says so in the second paragraph. The app is about honesty; the write-up should be too.
 
 ## Audiences, in order of urgency
