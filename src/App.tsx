@@ -35,6 +35,16 @@ type MembershipRow = Schema['Membership']['type']
 type Stage = 'loading' | 'signIn' | 'signUp' | 'confirm' | 'forgot' | 'resetConfirm' | 'in'
 type View = 'ping' | 'you' | 'team' | 'report' | 'dev'
 
+// The hash value stays 'ping' (old links keep working, and the model is still
+// Ping); only the rendered tab label changes.
+const VIEW_LABELS: Record<View, string> = {
+  ping: 'check-in',
+  you: 'you',
+  team: 'team',
+  report: 'report',
+  dev: 'dev',
+}
+
 const POSES: Array<{ pose: AvatarPose; label: string }> = [
   { pose: 'floating', label: 'floating' },
   { pose: 'waving', label: 'waving' },
@@ -431,7 +441,7 @@ function AuthGate({
         <LoginHorizon />
         <div className="auth-body">
           <h1 className="brand-large">signalcraft</h1>
-          <BlurText className="tagline" text="how's the water today?" delay={0.4} />
+          <BlurText className="tagline" text="how was today, honestly?" delay={0.4} />
           <form
             onSubmit={(e) => {
               e.preventDefault()
@@ -571,7 +581,10 @@ function Home({
     }
   })
   const [demoAccount, setDemoAccount] = useState<boolean | null>(null)
-  const sim = simPref ? simPref === 'on' : demoAccount === false && !isLead && !isDev
+  // Simulation is opt-in ONLY: nobody lands in it by accident, so what the
+  // page shows is always the live check-in flow unless a visitor asks for the
+  // sandbox. (The simulation itself is untouched — just no longer a default.)
+  const sim = simPref === 'on'
   const setSim = (on: boolean) => {
     setSimPref(on ? 'on' : 'off')
     try {
@@ -759,7 +772,7 @@ function Home({
             {!modeReady
               ? 'preview build'
               : sim
-                ? 'preview build · simulated experience — your pings stay in this browser'
+                ? 'preview build · simulated experience — your check-ins stay in this browser'
                 : 'preview build · live demo team'}
           </span>
           <span className="notice-short">{modeReady && sim ? 'simulated' : 'preview'}</span>
@@ -794,7 +807,7 @@ function Home({
         </span>
       </header>
 
-      <div className="scene-label hud-label" aria-label={`team weather: ${shownScene ?? 'no pings yet'}`}>
+      <div className="scene-label hud-label" aria-label={`team weather: ${shownScene ?? 'no check-ins yet'}`}>
           <SceneTitle className="scene-name" text={shownScene ?? 'still water'} />
           <p className="scene-caption">
             {preview && (
@@ -817,26 +830,30 @@ function Home({
             {!preview && modeReady && sim && simScore === null && (
               <>
                 <span className="preview-pill">simulated</span>
-                {simPinged} of 7 have pinged — {7 - simPinged === 1 ? "you're the last one" : 'your turn'}.
-                your ping decides the weather.
+                {simPinged} of 7 have checked in — {7 - simPinged === 1 ? "you're the last one" : 'your turn'}.
+                your check-in decides the weather.
               </>
             )}
             {!preview && modeReady && sim && simScore !== null && (
               <>
                 <span className="preview-pill">simulated</span>
-                {SCENES[simScene].caption} — {simPinged} of 7 pinged, average {simAvg.toFixed(1)}.
+                {SCENES[simScene].caption} — {simPinged} of 7 checked in, average {simAvg.toFixed(1)}.
                 {simPinged === 7 ? ' you set this.' : ''}
               </>
             )}
-            {!preview && modeReady && !sim && scene === null && "nobody's pinged yet today — set the tone."}
+            {!preview &&
+              modeReady &&
+              !sim &&
+              scene === null &&
+              'nobody has checked in yet today. Scrap is asleep, not gone.'}
             {!preview &&
               modeReady &&
               !sim &&
               scene === 'gathering' &&
-              `waiting on a few more before the water shows — pings stay anonymous. (${pingCount} of ${ANONYMITY_FLOOR} so far)`}
+              `waiting on a few more before the water shows — check-ins stay anonymous. (${pingCount} of ${ANONYMITY_FLOOR} so far)`}
             {!preview && modeReady && !sim && scene !== null && scene !== 'gathering' && (
               <>
-                {SCENES[scene].caption} — {pingCount} ping{pingCount === 1 ? '' : 's'} today
+                {SCENES[scene].caption} — {pingCount} checked in today
                 {typeof weather?.score === 'number' && `, average ${weather.score.toFixed(1)}`}
               </>
             )}
@@ -848,7 +865,7 @@ function Home({
           ≈
         </button>
       ) : (
-      <aside className="riverbank-island dock-bottom" aria-label={`${view} panel`}>
+      <aside className="riverbank-island dock-bottom" aria-label={`${VIEW_LABELS[view]} panel`}>
         <div className="island-head">
           <span className="brand">signalcraft</span>
           <button className="icon-btn" aria-label="hide the panel" title="hide" onClick={() => setCollapsed(true)}>
@@ -863,7 +880,7 @@ function Home({
               aria-current={view === v ? 'page' : undefined}
               onClick={() => setView(v)}
             >
-              {v}
+              {VIEW_LABELS[v]}
             </button>
           ))}
         </nav>
@@ -1049,7 +1066,7 @@ function SimTeam({ seats, seat, meName }: { seats: SimSeat[]; seat: number; meNa
         <span className="muted">7 seats · this browser only</span>
       </div>
       <p className="participation">
-        <strong>{pinged}</strong> of 7 have pinged — moods stay hidden; only the river shows them.
+        <strong>{pinged}</strong> of 7 have checked in — moods stay hidden; only the river shows them.
       </p>
       <ul className="roster">
         {seats.map((s, i) => (
@@ -1104,10 +1121,8 @@ function TeamPanel({
         </span>
       </div>
       <p className="participation">
-        <strong>{pingCount}</strong> ping{pingCount === 1 ? '' : 's'} in the last 24 hours —{' '}
-        {floorGap === 0
-          ? 'the water is showing.'
-          : `${floorGap} more before the water shows. who pinged stays private, always.`}
+        <strong>{pingCount}</strong> checked in today — never who, never what they said.
+        {floorGap > 0 && ` ${floorGap} more before the water shows.`}
       </p>
       <ul className="roster">
         {members.map((m) => {
@@ -1257,20 +1272,23 @@ function DevPanel({
   }> = [
     {
       scope: 'receipts',
-      label: 'forget today’s pings',
-      detail: 'clears the one-per-day receipts so demo accounts can ping again. the river keeps its weather.',
+      label: "forget today's check-ins (receipts)",
+      detail:
+        'clears the one-per-day receipts so demo accounts can check in again. the river keeps its weather.',
       destructive: false,
     },
     {
       scope: 'all',
       label: 'wipe the river',
-      detail: 'removes every ping, receipt, report, and request. weather recomputes to "gathering" on its own.',
+      detail:
+        'removes every check-in, receipt, report, and request. weather recomputes to "gathering" on its own.',
       destructive: true,
     },
     {
       scope: 'reseed',
       label: 'wipe and reseed',
-      detail: 'wipe pings and receipts, then drop a fresh day of five demo pings — past the anonymity floor, ready to present. reports are kept.',
+      detail:
+        'wipe check-ins and receipts, then drop a fresh day of five demo check-ins — past the anonymity floor, ready to present. reports are kept.',
       destructive: true,
     },
   ]
@@ -1364,9 +1382,10 @@ function SimPingForm({
   const [selected, setSelected] = useState<number | null>(null)
   if (score !== null)
     return (
-      <section className="card ping" aria-label="simulated ping">
+      <section className="card ping" aria-label="simulated check-in">
         <p className="pinged">
-          {seatName ? `${seatName} pinged ${score}` : `you pinged ${score}`} — the river went{' '}
+          {seatName ? `${seatName} checked in with a ${score}` : `you checked in with a ${score}`} —
+          the river went{' '}
           <strong>{scene}</strong>.{' '}
           {seatName
             ? 'every window of this browser sees it.'
@@ -1389,14 +1408,14 @@ function SimPingForm({
               onAgain()
             }}
           >
-            {seatName ? `ping again as ${seatName}` : 'ping again with the same teammates'}
+            {seatName ? `check in again as ${seatName}` : 'check in again with the same teammates'}
           </button>
         </div>
       </section>
     )
   return (
-    <section className="card ping" aria-label="simulated ping">
-      <h2 className="sr-only">drop a simulated ping</h2>
+    <section className="card ping" aria-label="simulated check-in">
+      <h2 className="sr-only">simulated check-in</h2>
       <div className="mood-selector-container" role="radiogroup" aria-label="your mood">
         {MOODS.map((m) => (
           <button
@@ -1414,13 +1433,13 @@ function SimPingForm({
       </div>
       <p className="mood-caption" aria-live="polite">
         {selected === null
-          ? 'six teammates have pinged. you decide the weather — 1 is sinking, 5 is glassy.'
+          ? 'six teammates have checked in. you decide the weather — 1 is sinking, 5 is glassy.'
           : `${selected} — ${MOODS.find((m) => m.score === selected)?.label}. simulated, nothing is saved.`}
       </p>
       {selected !== null && (
         <div className="ping-reveal">
           <button className="primary" onClick={() => onPing(selected)}>
-            drop the ping
+            check in
           </button>
         </div>
       )}
@@ -1495,25 +1514,25 @@ function PingForm() {
         expiresAt: Math.floor(Date.now() / 1000) + 8 * 24 * 60 * 60,
       })
       if (ping.errors) {
-        setError('your ping did not go through — try again.')
+        setError('your check-in did not go through — try again.')
         setStatus('idle')
         return
       }
       setStatus('done')
     } catch {
-      setError('something interrupted the ping — check your connection and try again.')
+      setError('something interrupted the check-in — check your connection and try again.')
       setStatus('idle')
     }
   }, [selected, note])
 
   if (status === 'done' || status === 'already')
     return (
-      <section className="card ping" aria-label="today's ping">
-        <h2>drop today's ping</h2>
+      <section className="card ping" aria-label="today's check-in">
+        <h2>today's check-in</h2>
         <p className="pinged">
           {status === 'done'
-            ? 'your ping is in the river. see you tomorrow.'
-            : "you've already pinged today — the river remembers."}
+            ? 'your check-in is in. Scrap felt that — see you tomorrow.'
+            : "you've already checked in today. Scrap remembers."}
         </p>
         {status === 'already' && (
           <button
@@ -1530,8 +1549,8 @@ function PingForm() {
     )
 
   return (
-    <section className="card ping" aria-label="today's ping">
-      <h2 className="sr-only">drop today's ping</h2>
+    <section className="card ping" aria-label="today's check-in">
+      <h2 className="sr-only">today's check-in</h2>
       <div className="mood-selector-container" role="radiogroup" aria-label="today's mood">
         {MOODS.map((m) => (
           <button
@@ -1550,7 +1569,7 @@ function PingForm() {
       <p className="mood-caption" aria-live="polite">
         {selected === null
           ? 'how is the water today? 1 is sinking, 5 is glassy.'
-          : `${selected} — ${MOODS.find((m) => m.score === selected)?.label}. anonymous, once a day.`}
+          : `${selected} — ${MOODS.find((m) => m.score === selected)?.label}. anonymous, once a day. any score powers him; only silence doesn't.`}
       </p>
       {selected !== null && (
         <div className="ping-reveal">
@@ -1563,7 +1582,7 @@ function PingForm() {
           />
           {error && <p className="error">{error}</p>}
           <button className="primary" disabled={status === 'sending'} onClick={submit}>
-            {status === 'sending' ? 'sending…' : 'drop the ping'}
+            {status === 'sending' ? 'sending signal…' : 'check in'}
           </button>
         </div>
       )}
