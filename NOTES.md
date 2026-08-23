@@ -96,3 +96,33 @@
   *scheduled* until Monday's paste proves it; teardown names both schedules.
 - **Cut, stated:** §7's "power state history" is not in the nightly aggregates — the
   entry carries the day's final power state only. The article must not claim more.
+
+## Sun 2026-08-23 — step 0 done (pre-flight)
+
+- **Repo is live and public:** https://github.com/SergioB03/Signalcraft — all six commits
+  pushed, `main` tracking. Undercurrent untouched.
+- **AWS session restored** (`aws login`, browser flow): account `174516978581`, region
+  `us-east-1`, ARN is the account root. Note for later: root is what Undercurrent used too;
+  not worth changing mid-build, but a real deployment wants an IAM role.
+- **Account is clean for this build.** `scheduler list-schedules` returns nothing, so both
+  Signalcraft schedules will be the only ones in the account — that makes the step 7
+  "exactly two schedules" check meaningful. Existing budgets: one unrelated `Cox Hackathon`
+  ($10). Amplify has only the Undercurrent app, so the Signalcraft app is still to create.
+- **Bedrock gates carried over, as predicted.** One `converse` against
+  `us.anthropic.claude-haiku-4-5-20251001-v1:0` returned `"signal received."`,
+  `stopReason end_turn`, 13 in / 6 out tokens — no account-verification wait, no use-case
+  form. The two gates that cost Undercurrent ~2h are account-level and already passed.
+- **$5 budget exists before any schedule.** `signalcraft-5usd`, MONTHLY COST, three
+  notifications: ACTUAL > 80%, ACTUAL > 100%, FORECASTED > 100%, all to the build email.
+  Definitions committed at `scripts/budget/`. Forecast alerts stay inert until the account
+  has spend history, so the two ACTUAL alerts ($4 and $5) are the guard that actually fires.
+- **Two CLI gotchas worth the note.** (1) The AWS Budgets endpoint is `us-east-1` — the
+  region flag is not optional there. (2) Windows PowerShell 5.1's `Set-Content -Encoding utf8`
+  writes a **BOM**, and the AWS CLI rejects the file with `Invalid JSON received`. Write
+  JSON payloads from bash (or `-Encoding utf8NoBOM` on PS7+); this will bite again on the
+  backfill payloads in step 5.
+- **Rename done:** `package.json` name, `<title>`, the two brand strings (App.tsx:433, :853),
+  the HUD stylesheet banner, and the demo-email domain — `isDemoEmail` (App.tsx:73) and
+  `seed-members.ts` both moved to `@signalcraft.local` together, so the cast still registers
+  as demo accounts. `npm run build` fails only on the known missing `amplify_outputs.json`,
+  which the Amplify app or `ampx sandbox` generates.

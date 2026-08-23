@@ -4,7 +4,7 @@
  * user can still change their own pose later).
  *
  * Run:  npx tsx scripts/seed-members.ts
- * Env:  DEMO_PASSWORD (shared by demoN@undercurrent.local), OUTPUTS (optional)
+ * Env:  DEMO_PASSWORD (shared by demoN@signalcraft.local), OUTPUTS (optional)
  */
 import { readFileSync } from 'node:fs'
 import { Amplify } from 'aws-amplify'
@@ -35,11 +35,11 @@ const CAST: Array<{
   pose: Pose
   spot: Spot
 }> = [
-  { email: 'demo1@undercurrent.local', name: 'ana', role: 'lead', pose: 'coconut', spot: 'shade' },
-  { email: 'demo2@undercurrent.local', name: 'kai', role: 'member', pose: 'floating', spot: 'drift' },
-  { email: 'demo3@undercurrent.local', name: 'mira', role: 'member', pose: 'waving', spot: 'headwater' },
-  { email: 'demo4@undercurrent.local', name: 'theo', role: 'member', pose: 'raft', spot: 'rapids' },
-  { email: 'demo5@undercurrent.local', name: 'june', role: 'member', pose: 'underwater', spot: 'eddy' },
+  { email: 'demo1@signalcraft.local', name: 'ana', role: 'lead', pose: 'coconut', spot: 'shade' },
+  { email: 'demo2@signalcraft.local', name: 'kai', role: 'member', pose: 'floating', spot: 'drift' },
+  { email: 'demo3@signalcraft.local', name: 'mira', role: 'member', pose: 'waving', spot: 'headwater' },
+  { email: 'demo4@signalcraft.local', name: 'theo', role: 'member', pose: 'raft', spot: 'rapids' },
+  { email: 'demo5@signalcraft.local', name: 'june', role: 'member', pose: 'underwater', spot: 'eddy' },
 ]
 
 Amplify.configure(outputs)

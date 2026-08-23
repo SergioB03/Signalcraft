@@ -70,7 +70,7 @@ function simCast(seed: number): SimMember[] {
   }))
 }
 
-const isDemoEmail = (email?: string) => !!email && email.endsWith('@undercurrent.local')
+const isDemoEmail = (email?: string) => !!email && email.endsWith('@signalcraft.local')
 
 // One simulated river per browser, shared by every window of it: the team
 // lives in localStorage and changes broadcast over a BroadcastChannel. Which
@@ -430,7 +430,7 @@ function AuthGate({
       <section className="auth-card" ref={cardRef}>
         <LoginHorizon />
         <div className="auth-body">
-          <h1 className="brand-large">undercurrent</h1>
+          <h1 className="brand-large">signalcraft</h1>
           <BlurText className="tagline" text="how's the water today?" delay={0.4} />
           <form
             onSubmit={(e) => {
@@ -850,7 +850,7 @@ function Home({
       ) : (
       <aside className="riverbank-island dock-bottom" aria-label={`${view} panel`}>
         <div className="island-head">
-          <span className="brand">undercurrent</span>
+          <span className="brand">signalcraft</span>
           <button className="icon-btn" aria-label="hide the panel" title="hide" onClick={() => setCollapsed(true)}>
             ⌄
           </button>
