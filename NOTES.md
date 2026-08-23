@@ -192,3 +192,14 @@
   not to."
 - **`.amplify/generated/env/*` stubs exist locally** so `tsc` passes without a sandbox;
   gitignored, and `ampx sandbox` overwrites them in step 3.
+- **Cast is live and steps 1–2 are proven end to end.** Six Cognito users created in
+  `us-east-1_TkksbSfEQ` (demo1 lead, demo2–5 member, dev dev — verified by
+  `list-users-in-group`, not just by the script's own output). Re-running `create-cast.sh`
+  reports "6 already existed" and exits 0, so it is genuinely idempotent. `seed-members.ts`
+  put ana/kai/mira/theo/june on the river. `checkin-as.ts demo2 2` wrote receipt
+  `…#2026-08-23` plus an anonymous ping; the second run created no ping and exited 0, which
+  is the fix from earlier working as intended.
+- **The AWS session is short-lived — plan step 4 around it.** It expired between 13:53 and
+  14:10, roughly a 20-minute window. Step 4 needs sustained CLI access (`ampx sandbox --once`,
+  a 12-minute `logs tail`, `scheduler get-schedule`, then a redeploy), so a mid-deploy expiry
+  there is an hour lost. Re-auth immediately before starting it.
