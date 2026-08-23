@@ -74,11 +74,11 @@ Live: `https://main.d3unb3p2wvfry3.amplifyapp.com` (app `d3unb3p2wvfry3`, branch
 
 | New / changed | Why |
 |---|---|
-| `amplify/data/resource.ts` | + `Robot` (id = teamId; powerState enum, signalCount, uniqueMembers), + `LogEntry` (id `teamId#dayKey`, dayKey, body, powerState, signalCount, uniqueMembers; readable by authenticated), + `allow.resource(computePower)` |
-| `amplify/functions/compute-power/` | Clone of compute-weather, **triggered by the `PingReceipt` stream and reading `PingReceipt` only** (unique userIds, rolling 24h) → upserts `Robot` via AppSync |
-| `amplify/functions/log-py/handler.py` | Clone of report-py: aggregates (count, unique members, notes), Scrap-voice prompt, `put_item` with `ConditionExpression='attribute_not_exists(id)'` |
-| `amplify/backend.ts` | PingReceipt stream → compute-power; `Schedule` + `LambdaInvoke` (aws-scheduler) → log Lambda; env `LOG_TABLE_NAME`, `PING_TABLE_NAME`, `RECEIPT_TABLE_NAME`, `TEAM_IDS` |
+| `amplify/data/resource.ts` | + `Robot` (id = teamId; powerState enum, signalCount, uniqueMembers), + `LogEntry` (id `teamId#dayKey`, dayKey, body, powerState, signalCount, uniqueMembers, `seeded`; readable by authenticated), + `allow.resource(computePower)` |
+| `amplify/functions/compute-power/` | Clone of compute-weather, **triggered by the `PingReceipt` stream (and hourly by `HourlyPowerTick` with `{source:'scheduler'}`) and reading `PingReceipt` only** (unique userIds, rolling 24h) → upserts `Robot` via AppSync. `power.ts` = pure `powerStateFor(uniqueMembers)` + `power.test.ts`; `scripts/check-power-is-mood-free.sh` greps the handler for `Ping`/`score` |
+| `amplify/functions/log-py/handler.py` | Clone of report-py: `{source:'scheduler'}` or backfill `{teamId, dayKey, aggregates}`; fixed-offset dayKey (no zoneinfo); `get_item` before Bedrock; Scrap-voice prompt from `docs/marketing/scrap-voice.md`; `put_item` with `ConditionExpression='attribute_not_exists(id)'`, `seeded` flag |
+| `amplify/backend.ts` | PingReceipt stream → compute-power; `agent` stack: `NightlyLog` (cron 00:30 America/New_York) and `HourlyPowerTick` (rate 1 h) `Schedule`s with `LambdaInvoke` targets; env `LOG_TABLE_NAME`, `PING_TABLE_NAME`, `RECEIPT_TABLE_NAME`, `GROUP_IDS` |
 | `src/scrap/Scrap.tsx` (+ `scrap.css`) | SVG with named `<g>` parts; `powerState` prop → attributes/classes; CSS vars; reduced-motion in CSS |
-| `src/scrap/power.ts` | `powerStateFor(uniqueMembers: number)` — pure, shared by Lambda logic and UI, checkable by eye |
+| `src/scrap/Scrap.tsx` imports `PowerState` from `amplify/functions/compute-power/power.ts` | one source of truth for the five states; thresholds 0 / 1 / 2 / 3–4 / 5+ (lowered for a five-person cast) |
 | `App.tsx` | `Robot.observeQuery` effect; `LogPanel` (latest `LogEntry` by dayKey desc); copy rename ping → check-in; footer disclosure |
-| `scripts/backfill-log.ts`, `scripts/prove-log.ts` | Seeded history (deterministic ids, backdated createdAt); scheduler proof |
+| `scripts/backfill-log.ts`, `prove-log.ts`, `checkin-as.ts`, `show-robot.ts`, `create-cast.sh` | Seeded history Aug 18–22 (deterministic ids, backdated createdAt, `seeded=true`); scheduler proof; check in as any cast member from the terminal; Cognito cast creation |

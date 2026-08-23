@@ -186,8 +186,8 @@ README so future-you actually does it.
 - **Agents** (`.claude/agents/`): `staff-engineer` — review the step's diff before committing
   (spawn it; do not self-review at length). `marketing` — anything a reader sees: README,
   article, posts, microcopy. `tutor` — learn mode (cheap model). **Steve** (`/initiate-steve`,
-  hosted Managed Agent, costs real API money) at most twice: after step 4 (backend wired) and
-  after step 7 (before recording).
+  hosted Managed Agent, costs real API money) once, after step 4, with two yes/no questions
+  (Bedrock call cap; dayKey overwrite / score leak); an optional second in the stop-line buffer.
 - **Learn mode is ON.** After each step, append an entry to `docs/learn/JOURNAL.md` (React
   concept + system-design concept anchored to file:line, one check question, one "at scale"
   line). Inline if the step was small; spawn `tutor` if it touched more than ~3 files.

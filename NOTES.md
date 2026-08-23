@@ -62,3 +62,21 @@
   facts only the build can supply; `docs/demo-script.md` is the 75-second shot list.
   The point of doing it first: the copy now constrains the build (captions per power
   state, seeded-entry label, footer line) instead of being reverse-engineered Sunday night.
+- **Plan review (three independent designs, one judge) changed four things.** (1) Power was
+  only recomputed on `PingReceipt` stream events and receipts have no TTL, so Scrap would
+  never have powered down — the rolling window didn't roll. Fix: an `HourlyPowerTick`
+  EventBridge schedule invokes `compute-power` with `{source:'scheduler'}`. That tick is
+  the code that makes "he only runs low when nobody says anything" true. (2) `zoneinfo`
+  isn't available in the boto3-only Python 3.12 runtime (no tzdata, no pip), so `dayKey`
+  uses a fixed -4h offset (EDT holds through Aug 30) plus -6h so the 00:30 ET run keys to
+  the day that just ended; the Scheduler's own `timeZone` handles the cron. Concept-build
+  shortcut, stated as such. (3) Nightly cron moves to 00:30 ET so the first autonomous
+  entry lands before Monday's deadline and can be shown. (4) Delete the sandbox after
+  production verification so exactly one `NightlyLog` fires. Also adopted: a `seeded`
+  flag on `LogEntry` with a badge in the UI, `powerStateFor()` with one parameter + a unit
+  test + a grep guard (`npm run check:power`) so "power never sees a score" is a command,
+  thresholds lowered to 0/1/2/3-4/5+ for a five-person cast, and `checkin-as.ts` because
+  five browsers is not a demo plan.
+- **Undercurrent stays intact.** Nothing deleted — river, WeatherState, ReportPanel, sim
+  mode (hidden behind an explicit opt-in). Additive delta only; the river doubles as the
+  on-screen proof that mood and power are different things.
