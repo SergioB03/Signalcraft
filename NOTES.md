@@ -203,3 +203,34 @@
   14:10, roughly a 20-minute window. Step 4 needs sustained CLI access (`ampx sandbox --once`,
   a 12-minute `logs tail`, `scheduler get-schedule`, then a redeploy), so a mid-deploy expiry
   there is an hour lost. Re-auth immediately before starting it.
+
+## Sun 2026-08-23 21:00 — stepping off the deadline
+
+- **Not submitting.** Called it at 9 PM with steps 3–7 outstanding and ~3 hours to the cron
+  window. The honest arithmetic was 8 hours of plan against 3, and the only thing with a
+  genuine tonight-or-never deadline was the 00:30 cron — because there is no second night
+  before Monday's cutoff. Chose a long weekend ending well over a submission ending badly.
+- **Signalcraft continues as a slow build.** Same build order, no clock. The tier-1 list in
+  CLAUDE.md §4 is still the right definition of done; it just isn't due.
+- **Nothing is running unattended, and that is not luck — step 4 was never started.** No
+  EventBridge schedule has ever existed in this account. The only Lambdas deployed are
+  Undercurrent's `compute-weather` and `reset-demo`, both event-driven. Lifetime Bedrock
+  usage for Signalcraft is the step 0 smoke test: 13 in, 6 out. The $5 budget is armed with
+  two ACTUAL alerts. §9's teardown urgency is about a nightly job left running — that
+  failure mode does not exist yet, and won't until step 4 deploys a schedule.
+- **What is deployed and costing (approximately nothing):** the Amplify app
+  `djn4f67hmb4wh`, Cognito pool `us-east-1_TkksbSfEQ` with six users, AppSync + DynamoDB
+  with the seeded cast and one check-in. All comfortably inside free tier at this volume.
+  Left running on purpose — it is the thing to build on.
+- **PLAN.md's header now carries a banner saying the deadline is off.** Without it, the read
+  order in CLAUDE.md §11 (PLAN.md first, every session) would have future sessions opening
+  on "T+0:30, cut if late" and sprinting at a finish line that no longer exists.
+- **Next time, the natural place to pick up is step 3** — `Robot` + `LogEntry`, `power.ts`
+  with its unit test and the `check:power` grep guard, `compute-power` on the PingReceipt
+  stream. It is the step where "power never sees a score" stops being intent and becomes a
+  command. Step 4 (the scheduler) is the one to do when there is a clear evening for it,
+  since it ends with a live cron that then wants watching.
+- **Two live gotchas carried forward:** the AWS session expires in roughly 20 minutes and
+  fails as a raw cache-key error rather than a clean message, so re-auth immediately before
+  any multi-step CLI work; and `npx ampx` needs the devDependencies installed, which a
+  `dependencies`-only `npm install` silently skips.

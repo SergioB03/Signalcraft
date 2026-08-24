@@ -1,6 +1,14 @@
 # Signalcraft — Build Plan
 
-**Now:** Sun 2026-08-23 ≈ 1:30 AM ET · **Deadline:** Mon Aug 24 1:00 PM PT / 4:00 PM ET · **Target submit:** Sun night (Mon morning = verification + buffer) · First 101 qualifying submissions win; no judging.
+> **Status as of Sun Aug 23, 2026, 9:00 PM ET — the challenge deadline is no longer being
+> chased.** Not submitting. Signalcraft continues as a slow build, for the learning and
+> because Scrap deserves to exist. Everything below is still the right build order; ignore
+> the clock column, the "cut if late" column, and the "STOP BUILDING" line — they were
+> written for a sprint that is over. No schedule has ever been created, so nothing is
+> running unattended and the teardown urgency in §9 does not apply yet. Re-read this banner
+> before treating any time estimate here as real.
+
+**Original framing (kept for the record):** Deadline was Mon Aug 24 1:00 PM PT / 4:00 PM ET; first 101 qualifying submissions won a jacket; no judging.
 
 ## Context
 
